@@ -5,24 +5,27 @@ PDF parsing functionalities with fast and high-quality modes.
 import os
 import re
 import requests
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 from pathlib import Path
 import fitz
 from arxiv2text import arxiv_to_md
 
 @dataclass
-class ParseConfig:
-    # For VLM parsing
-    model: str="benhaotang/Nanonets-OCR-s:latest"
-    base_url: str="http://localhost:11434/v1"
+class VLMConfig:
+    provider: str="ollama"
     api_key: Optional[str]=None
-    image_dir: str="./tmp"
+    base_url: str="http://localhost:11434/v1"
+    model: str="benhaotang/Nanonets-OCR-s:latest"
+    batch: bool=False
+    prompt: str="""Extract the text from the above document as if you were reading it naturally. Return the tables in html format. Return the equations in LaTeX representation. If there is an image in the document and image caption is not present, add a small description of the image inside the <img></img> tag; otherwise, add the image caption inside <img></img>. Watermarks should be wrapped in brackets. Ex: <watermark>OFFICIAL COPY</watermark>. Page numbers should be wrapped in brackets. Ex: <page_number>14</page_number> or <page_number>9/22</page_number>. Prefer using ☐ and ☑ for check boxes."""
     dpi: int=200
-    vlm_prompt: str="""Extract the text from the above document as if you were reading it naturally. Return the tables in html format. Return the equations in LaTeX representation. If there is an image in the document and image caption is not present, add a small description of the image inside the <img></img> tag; otherwise, add the image caption inside <img></img>. Watermarks should be wrapped in brackets. Ex: <watermark>OFFICIAL COPY</watermark>. Page numbers should be wrapped in brackets. Ex: <page_number>14</page_number> or <page_number>9/22</page_number>. Prefer using ☐ and ☑ for check boxes."""
 
-    # For fast parsing (arxiv2text)
-    markdown_dir: str="./tmp"
+@dataclass
+class ParseConfig:
+    enable_vlm: bool=True
+    tmp_dir: str="./tmp"
+    vlm: Optional[VLMConfig]=field(default_factory=VLMConfig)
 
 @dataclass
 class ParseResult:
@@ -37,16 +40,16 @@ def parse_fast(pdf_url: str, config: ParseConfig) -> ParseResult:
     """
     try:
         # Use arxiv2text to convert PDF to markdown
-        arxiv_to_md(pdf_url, config.markdown_folder)
+        arxiv_to_md(pdf_url, config.tmp_dir)
         
         # Find the generated markdown file
-        generated_files = [f for f in os.listdir(config.markdown_folder) if f.endswith('.md')]
+        generated_files = [f for f in os.listdir(config.tmp_dir) if f.endswith('.md')]
         if not generated_files:
             raise ValueError("No markdown files found.")
         
         # Get the most recent file
-        generated_files.sort(key=lambda f: os.path.getmtime(os.path.join(config.markdown_folder, f)), reverse=True)
-        latest_file_path = os.path.join(config.markdown_folder, generated_files[0])
+        generated_files.sort(key=lambda f: os.path.getmtime(os.path.join(config.tmp_dir, f)), reverse=True)
+        latest_file_path = os.path.join(config.tmp_dir, generated_files[0])
         
         # Read and clean the content
         with open(latest_file_path, 'r', encoding='utf-8') as file:
@@ -82,14 +85,14 @@ def parse_vlm(pdf_url: str, config: ParseConfig) -> ParseResult:
     High-quality VLM parsing.
     """
     try:
-        image_dir = Path(config.image_dir)
+        image_dir = Path(config.tmp_dir)
         image_dir.mkdir(parents=True,exist_ok=True)
 
         if pdf_url.startswith(('http://','https://')):
             response = requests.get(pdf_url)
             response.raise_for_status()
 
-            pdf_path = Path(config.image_dir) / "temp.pdf"
+            pdf_path = Path(config.tmp_dir) / "temp.pdf"
             with open(pdf_path,'wb') as f:
                 f.write(response.content)
         else:
@@ -100,7 +103,7 @@ def parse_vlm(pdf_url: str, config: ParseConfig) -> ParseResult:
 
         for page_num in range(len(pdf_document)):
             page = pdf_document.load_page(page_num)
-            mat = fitz.Matrix(config.dpi/72, config.dpi/72)
+            mat = fitz.Matrix(config.vlm.dpi/72, config.vlm.dpi/72)
             pix = page.get_pixmap(matrix=mat)
 
             image_path = image_dir/f"page_{page_num+1}.png"
@@ -113,7 +116,7 @@ def parse_vlm(pdf_url: str, config: ParseConfig) -> ParseResult:
 
         for i, image_path in enumerate(image_paths):
             try:
-                page_content = _process_image_with_vlm(image_path, config)
+                page_content = _process_image_with_vlm(image_path, config.vlm)
                 page_contents.append(page_content)
 
             except Exception as e:
@@ -141,7 +144,7 @@ def parse_vlm(pdf_url: str, config: ParseConfig) -> ParseResult:
         print(f"Falling back to fast parsing...")
         return parse_fast(pdf_url,config)
     
-def _process_image_with_vlm(image_path: str, config: ParseConfig) -> str:
+def _process_image_with_vlm(image_path: str, config: VLMConfig) -> str:
     """
     Process a single image with a VLM using OpenAI-compatible API.
     """
@@ -165,7 +168,7 @@ def _process_image_with_vlm(image_path: str, config: ParseConfig) -> str:
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": config.vlm_prompt},
+                    {"type": "text", "text": config.prompt},
                     {
                         "type": "image_url",
                         "image_url": {

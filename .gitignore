@@ -2,3 +2,5 @@ legacy*.py
 project_roadmap.md
 downloads/
 tmp/
+__pycache__
+config.yaml
