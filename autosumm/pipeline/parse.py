@@ -15,7 +15,7 @@ from arxiv2text import arxiv_to_md
 class VLMConfig:
     provider: str="ollama"
     api_key: Optional[str]=None
-    base_url: str="http://localhost:11434/v1"
+    base_url: str="http://localhost:11434"
     model: str="benhaotang/Nanonets-OCR-s:latest"
     batch: bool=False
     prompt: str="""Extract the text from the above document as if you were reading it naturally. Return the tables in html format. Return the equations in LaTeX representation. If there is an image in the document and image caption is not present, add a small description of the image inside the <img></img> tag; otherwise, add the image caption inside <img></img>. Watermarks should be wrapped in brackets. Ex: <watermark>OFFICIAL COPY</watermark>. Page numbers should be wrapped in brackets. Ex: <page_number>14</page_number> or <page_number>9/22</page_number>. Prefer using ☐ and ☑ for check boxes."""
@@ -154,7 +154,7 @@ def _process_image_with_vlm(image_path: str, config: VLMConfig) -> str:
         image_data = base64.b64encode(image_file.read()).decode('utf-8')
 
     # Construct endpoint URL
-    endpoint = f"{config.base_url}/chat/completions"
+    endpoint = f"{config.base_url}/v1/chat/completions"
     
     # Prepare headers with API key if provided
     headers = {"Content-Type": "application/json"}

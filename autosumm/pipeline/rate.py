@@ -14,6 +14,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from json_repair import repair_json
 
+try:
+    from client import BaseClient, BatchConfig, count_tokens, truncate_to_tokens
+except:
+    from .client import BaseClient, BatchConfig, count_tokens, truncate_to_tokens
+
 @dataclass
 class EmbedderConfig:
     provider: str
@@ -50,21 +55,6 @@ class RateResult:
     error: Optional[str]
     method: str="embed"
     metadata: Optional[Dict]=None # LLM justifications
-
-
-def count_tokens(text: str) -> int:
-    encoding = tiktoken.get_encoding("cl100k_base")
-    return len(encoding.encode(text,disallowed_special=()))
-
-def truncate_to_tokens(text: str, max_tokens: int) -> str:
-    """Truncate text"""
-    encoding = tiktoken.get_encoding("cl100k_base")
-    tokens = encoding.encode(text, disallowed_special=())
-    if len(tokens) <= max_tokens:
-        return text
-    
-    truncated_tokens = tokens[:max_tokens]
-    return encoding.decode(truncated_tokens)
 
 def cosine_similarity(a: List[float], b: List[float]) -> float:
     a = np.array(a)
@@ -179,9 +169,16 @@ class EmbedderClient:
 class LLMClient:
     def __init__(self, config: LLMConfig):
         self.config = config
-        self.context_length = config.context_length or 65536
-        prompt_tokens = count_tokens(self.config.system_prompt) + count_tokens(self.config.user_prompt_template)
-        self.context_length -= prompt_tokens - self.config.completion_options.get("max_tokens",1024)
+        
+        prompt_tokens = 0
+        if config.system_prompt:
+            prompt_tokens += count_tokens(config.system_prompt)
+        if config.user_prompt_template:
+            prompt_tokens += count_tokens(config.user_prompt_template)
+        output_tokens = config.completion_options.get('max_tokens',256)
+        
+        base_context = config.context_length or 65536
+        self.available_length = base_context - prompt_tokens - output_tokens
 
     def _create_rating_prompt(self, parsed_content: str) -> str:
         """Create prompt for rating a paper based on configured criteria"""
@@ -240,8 +237,8 @@ class LLMClient:
     def rate_paper(self, parsed_content: str) -> Tuple[float, Optional[Dict]]:
         """Rate a single paper and return weighted score."""
         token_count = count_tokens(parsed_content)
-        if token_count > self.context_length:
-            parsed_content = truncate_to_tokens(parsed_content, self.context_length)
+        if token_count > self.available_context:
+            parsed_content = truncate_to_tokens(parsed_content, self.available_context)
 
         user_prompt = self._create_rating_prompt(parsed_content)
 
