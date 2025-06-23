@@ -2,9 +2,6 @@
 Summarize parsed papers using LLM
 """
 
-import requests
-import json
-import tiktoken
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 
@@ -34,16 +31,16 @@ class SummaryResult:
 class SummarizerClient(BaseClient):
     def __init__(self, config: SummarizerConfig, batch_config: Optional[BatchConfig]=None):
         super().__init__(config, batch_config)
+        # estimate available context
         prompt_tokens = 0
         if config.system_prompt:
             prompt_tokens += count_tokens(config.system_prompt)
         if config.user_prompt_template:
-            template_without_content = config.user_prompt_template.replace("{paper_content}", "")
-            prompt_tokens += count_tokens(template_without_content)
-        
+            prompt_tokens += count_tokens(config.user_prompt_template)
+        safety_margin = 128
         output_tokens = config.completion_options.get('max_tokens', 8192)
         base_context = config.context_length or 65536
-        self.available_context = base_context - prompt_tokens - output_tokens
+        self.available_context = base_context - prompt_tokens - output_tokens - safety_margin
     
     def _build_payload(self, parsed_content: str) -> dict:
         """Build API payload for summarization request."""
@@ -94,22 +91,19 @@ class SummarizerClient(BaseClient):
         messages.append({"role": "user", "content": user_content})
         return messages
 
-def summarize(parsed_content: str, config: SummarizerConfig) -> SummaryResult:
-    """Summarize a single paper using configured LLM"""
-    client = SummarizerClient(config)
-    summary = client.process_single(parsed_content)
-
-    return SummaryResult(
-        content=summary,
-        success=True,
-        error=""
-    )
-
-def summarize_batch(parsed_contents: List[str], config: SummarizerConfig, batch_config: Optional[BatchConfig] = None) -> List[SummaryResult]:
+def summarize(parsed_contents: List[str], config: SummarizerConfig, batch_config: Optional[BatchConfig] = None) -> List[SummaryResult]:
     """Summarize multiple papers using batch processing when possible."""
     if not getattr(config, 'batch', False):
         # If batch is disabled, process sequentially
-        return [summarize(content, config) for content in parsed_contents]
+        client = SummarizerClient(config, batch_config)
+        results = [client.process_single(content) for content in parsed_contents]
+        return [
+            SummaryResult(
+                content=result or "",
+                success=result is not None,
+                error=None if result is not None else "Single processing failed for this item"
+            ) for result in results
+        ]
     
     try:
         client = SummarizerClient(config, batch_config)
@@ -120,8 +114,7 @@ def summarize_batch(parsed_contents: List[str], config: SummarizerConfig, batch_
                 content=result or "",
                 success=result is not None,
                 error=None if result is not None else "Batch processing failed for this item",
-            )
-            for result in results
+            ) for result in results
         ]
         
     except Exception as e:
@@ -175,7 +168,7 @@ Summary:"""
     # Test with sample content
     sample_content = """This is a sample research paper about machine learning. The paper introduces a new neural network architecture that achieves state-of-the-art results on image classification tasks. The methodology involves a novel attention mechanism that improves feature extraction. Experiments on ImageNet show 2% improvement over previous best results."""
 
-    result = summarize_batch([sample_content], config,batch_config)[0]
+    result = summarize([sample_content], config,batch_config)[0]
     
     if result.success:
         print("Summary generated successfully:")

@@ -29,7 +29,7 @@ class BaseClient(ABC):
         pass
 
     @abstractmethod
-    def _parse_response(self, response_content: str) -> str:
+    def _parse_response(self, response_content: str) -> Any:
         """Parse API response content. Must be implemented by subclasses."""
         pass
 
@@ -58,7 +58,7 @@ class BaseClient(ABC):
         else:
             return self._handle_openai_response(response, payload.get("stream", False))
         
-    def _handle_ollam_response(self, response, is_streaming: bool) -> str:
+    def _handle_ollama_response(self, response, is_streaming: bool) -> str:
         """Handle Ollama API response format."""
         if is_streaming:
             full_response = ""
