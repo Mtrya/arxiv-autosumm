@@ -255,47 +255,35 @@ class BaseClient(ABC):
             else:
                 raise ValueError("Batch processing not supported for Ollama provider")
             
-        try:
-            tmp_dir = Path(self.batch_config.tmp_dir)
-            tmp_dir.mkdir(parents=True,exist_ok=True)
+        tmp_dir = Path(self.batch_config.tmp_dir)
+        tmp_dir.mkdir(parents=True,exist_ok=True)
 
-            jsonl_path = tmp_dir/f"batch_input_{int(time.time())}.jsonl"
-            output_path = tmp_dir/f"batch_output_{int(time.time())}.jsonl"
+        jsonl_path = tmp_dir/f"batch_input_{int(time.time())}.jsonl"
+        output_path = tmp_dir/f"batch_output_{int(time.time())}.jsonl"
 
-            # Create batch job
-            self._create_batch_jsonl(input_data_list,str(jsonl_path))
-            batch_id = self._submit_batch_job(str(jsonl_path))
+        # Create batch job
+        self._create_batch_jsonl(input_data_list,str(jsonl_path))
+        batch_id = self._submit_batch_job(str(jsonl_path))
 
-            # Wait for completion and download results
-            batch_info = self._wait_for_batch(batch_id)
-            batch_results = self._download_batch_results(batch_info,str(output_path))
+        # Wait for completion and download results
+        batch_info = self._wait_for_batch(batch_id)
+        batch_results = self._download_batch_results(batch_info,str(output_path))
 
-            # Retry failed items individually
-            final_results = self._retry_failed_items(input_data_list,batch_results)
+        # Retry failed items individually
+        final_results = self._retry_failed_items(input_data_list,batch_results)
 
-            # Cleanup
-            jsonl_path.unlink(missing_ok=True)
-            output_path.unlink(missing_ok=True)
+        # Cleanup
+        jsonl_path.unlink(missing_ok=True)
+        output_path.unlink(missing_ok=True)
 
-            return final_results
-        
-        except Exception as e:
-            print(f"Batch processing failed: {e}")
-            if self.batch_config.fallback_on_error:
-                print("Falling back to sequential processing...")
-                return [self.process_single(input_data) for input_data in input_data_list]
-            else:
-                raise
+        return final_results
 
     def process_single(self, input_data: Any) -> Optional[str]:
         """Process single input synchronously"""
-        try:
-            payload = self._build_payload(input_data)
-            response_content = self._make_sync_request(payload)
-            return self._parse_response(response_content)
-        except Exception as e:
-            print(f"Single processing failed: {e}")
-            return None
+        payload = self._build_payload(input_data)
+        response_content = self._make_sync_request(payload)
+        return self._parse_response(response_content)
+
 
 
 def count_tokens(text: str) -> int:

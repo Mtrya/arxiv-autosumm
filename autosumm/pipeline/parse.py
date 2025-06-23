@@ -24,11 +24,14 @@ class ParserVLMConfig:
     base_url: str="http://localhost:11434"
     model: str="benhaotang/Nanonets-OCR-s:latest"
     batch: bool=False
-    prompt: str="""Extract the text from the above document as if you were reading it naturally. Return the tables in html format. Return the equations in LaTeX representation. If there is an image in the document and image caption is not present, add a small description of the image inside the <img></img> tag; otherwise, add the image caption inside <img></img>. Watermarks should be wrapped in brackets. Ex: <watermark>OFFICIAL COPY</watermark>. Page numbers should be wrapped in brackets. Ex: <page_number>14</page_number> or <page_number>9/22</page_number>. Prefer using ☐ and ☑ for check boxes."""
+    system_prompt: str="""You are an AI specialized in recognizing and extracting text. 
+                Your mission is to analyze the image document and generate the result in markdown format, use markdown syntax to preserve the title level of the original document.
+                You should not include page numbers for better readability."""
+    user_prompt: str="""Extract the text from the above document as if you were reading it naturally."""
     dpi: int=160
 
 @dataclass
-class ParseConfig:
+class ParserConfig:
     enable_vlm: bool=True
     tmp_dir: str="./tmp"
     vlm: Optional[ParserVLMConfig]=field(default_factory=ParserVLMConfig)
@@ -148,13 +151,15 @@ class ParserVLMClient(BaseClient):
         with open(image_data.image_path,'rb') as f:
             image_base64 = base64.b64encode(f.read()).decode('utf-8')
         
-        messages = [{
+        messages = [{"role": "system", "content": self.config.system_prompt}]
+        
+        messages.append({
             "role": "user",
             "content": [
-                {"type": "text","text": self.config.prompt},
+                {"type": "text","text": self.config.user_prompt},
                 {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}}
             ]
-        }]
+        })
 
         payload = {
             "model": self.config.model,
@@ -221,7 +226,7 @@ def parse_vlm(pdf_urls: List[str], config: ParserVLMConfig, batch_config: Option
 
     return results
 
-def parse_fast(pdf_urls: List[str], config: ParseConfig) -> List[ParseResult]:
+def parse_fast(pdf_urls: List[str], config: ParserConfig) -> List[ParseResult]:
     """
     Fast parsing using arxiv2text for rating phase.
     """
@@ -269,10 +274,18 @@ def parse_fast(pdf_urls: List[str], config: ParseConfig) -> List[ParseResult]:
                 error=str(e),
                 method="fast"
             ))
+        
+    return results
     
 
 if __name__ == "__main__":
-    config = ParserVLMConfig()
+    config = ParserVLMConfig(
+        provider="aliyun",
+        api_key=os.getenv("DASHSCOPE_API_KEY"),
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        model="qwen-vl-plus",
+        batch=True,
+    )
 
     pdf_url = "http://arxiv.org/pdf/1706.03762"
     result = parse_vlm([pdf_url], config)[0]

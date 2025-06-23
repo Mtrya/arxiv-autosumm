@@ -5,14 +5,21 @@ Handles only paper fetching and pdf downloading.
 
 from dataclasses import dataclass
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import requests
 import arxiv
 import time
 
 @dataclass
-class PaperMetadata:
+class FetchConfig:
+    category: str
+    days: int
+    max_results: int
+    max_retries: int
+
+@dataclass
+class FetchResult:
     title: str
     pdf_url: str
     authors: List[str]
@@ -22,32 +29,19 @@ class PaperMetadata:
     citation: Optional[str]
     submitted_date: datetime
 
-@dataclass
-class FetchConfig:
-    categories: List[str]
-    start_date: str # format: YYYYMMDD
-    end_date: str # format: YYYYMMDD
-    max_results: int=1000
-    max_retires: int=10
-    output_dir: str="./downloads"
-
-@dataclass
-class DownloadResult:
-    paper: PaperMetadata
-    file_path: Optional[str]
-    success: bool
-    error: Optional[str]
-
-def fetch_paper_metadata(config: FetchConfig) -> List[PaperMetadata]:
+def fetch(config: FetchConfig) -> List[FetchResult]:
     """
     Fetch paper metadata from arXiv based on categories and date range.
     """
     client = arxiv.Client()
 
-    category_queries = [f'cat:{cat}' for cat in config.categories]
-    category_query = ' OR '.join(category_queries)
-    date_query = f'submittedDate:[{config.start_date} TO {config.end_date}]'
-    full_query = f'{category_query} AND {date_query}'
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=config.days)
+    start_date_str = start_date.strftime("%Y%m%d") 
+    end_date_str = end_date.strftime("%Y%m%d")
+
+    date_query = f'submittedDate:[{start_date_str} TO {end_date_str}]'
+    full_query = f'{config.category} AND {date_query}'
 
     search = arxiv.Search(
         query=full_query,
@@ -58,10 +52,10 @@ def fetch_paper_metadata(config: FetchConfig) -> List[PaperMetadata]:
     papers = []
     results = client.results(search)
 
-    for attempt in range(config.max_retires):
+    for attempt in range(config.max_retries):
         try:
             for result in results:
-                papers.append(PaperMetadata(
+                papers.append(FetchResult(
                     title=result.title,
                     pdf_url=result.pdf_url,
                     authors=[author.name for author in result.authors],
@@ -81,67 +75,16 @@ def fetch_paper_metadata(config: FetchConfig) -> List[PaperMetadata]:
     
     return papers
 
-def download_paper_pdfs(papers: List[PaperMetadata], config: FetchConfig) -> List[DownloadResult]:
-    """
-    Download PDF files for a list of papers aynchronously.
-    """
-    output_path = Path(config.output_dir)
-    output_path.mkdir(parents=True,exist_ok=True)
-
-    results = []
-
-    for paper in papers:
-        try:
-            filename = f"{paper.arxiv_id}.pdf"
-            file_path = output_path / filename
-
-            response = requests.get(paper.pdf_url,stream=True)
-            response.raise_for_status()
-
-            with open(file_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-
-            results.append(DownloadResult(
-                paper=paper,
-                file_path=str(file_path),
-                success=True,
-                error=""
-            ))
-
-        except Exception as e:
-            results.append(DownloadResult(
-                paper=paper,
-                file_path=None,
-                success=False,
-                error=str(e)
-            ))
-
-    return results
-
-def fetch_and_download(config: FetchConfig) -> List[DownloadResult]:
-    """
-    Wrapper function.
-    """
-    papers = fetch_paper_metadata(config)
-    print(len(papers))
-    results = download_paper_pdfs(papers,config)
-    return results
 
 if __name__ == "__main__":
     config = FetchConfig(
-        categories=["cs.AI"],
-        start_date="20250601",
-        end_date="20250602",
-        max_results=2
+        category="cs.AI",
+        days=8,
+        max_results=10,
+        max_retries=10
     )
 
-    results = fetch_and_download(config)
+    results = fetch(config)
 
     for result in results:
-        if result.success:
-            print(f"Downloaded: {result.paper.title} -> {result.file_path}")
-        else:
-            print(f"Failed: {result.paper.title} - {result.error}")
-        print(result.paper.pdf_url)
+        print(result)
