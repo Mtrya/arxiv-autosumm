@@ -39,7 +39,7 @@ class RaterLLMConfig:
     criteria: Dict[str,Dict[str,Union[str,float]]]
 
 @dataclass
-class RateConfig:
+class RaterConfig:
     top_k: int
     embedder: RaterEmbedderConfig
     llm: Optional[RaterLLMConfig]
@@ -250,7 +250,7 @@ class RaterLLMClient(BaseClient):
         return messages
 
         
-def rate_embed(parsed_contents: List[str], config: RateConfig) -> List[RateResult]:
+def rate_embed(parsed_contents: List[str], config: RaterConfig) -> List[RateResult]:
     """Rate paper using embedding similarity"""
     
     embedder_client = EmbedderClient(config.embedder)
@@ -276,7 +276,7 @@ def rate_embed(parsed_contents: List[str], config: RateConfig) -> List[RateResul
 
     return results
 
-def rate_llm(parsed_contents: List[str], config: RateConfig, batch_config: Optional[BatchConfig]=None) -> List[RateResult]:
+def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Optional[BatchConfig]=None) -> List[RateResult]:
     """Rate multiple papers using batch processing when configured"""
     if not getattr(config, 'batch', False):
         client = RaterLLMClient(config.llm,batch_config)
@@ -380,7 +380,7 @@ Provide your response as a JSON object with "ratings" and "justifications" field
     }
     )
 
-    rate_config = RateConfig(
+    rate_config = RaterConfig(
         top_k=200,
         embedder=embedder_config,
         llm=llm_config

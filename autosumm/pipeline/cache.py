@@ -14,12 +14,12 @@ from dataclasses import dataclass
 from typing import Optional, Tuple, Dict, Any
 
 @dataclass
-class CacheConfig:
+class CacherConfig:
     dir: str
     ttl_days: int
 
-class CacheManager:
-    def __init__(self, config: CacheConfig):
+class Cacher:
+    def __init__(self, config: CacherConfig):
         self.config = config
         self.cache_dir = Path(config.dir).expanduser()
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -430,13 +430,13 @@ class CacheManager:
 
 if __name__ == "__main__":
     """Example usage and testing."""
-    config = CacheConfig(
+    config = CacherConfig(
         dir="~/.cache/arxiv-autosumm",
         ttl_days=14,
         store_pdf=False
     )
     
-    cache = CacheManager(config)
+    cache = Cacher(config)
     
     # Test config change detection
     test_config = {

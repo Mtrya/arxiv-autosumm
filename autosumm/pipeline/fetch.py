@@ -12,7 +12,7 @@ import arxiv
 import time
 
 @dataclass
-class FetchConfig:
+class FetcherConfig:
     category: str
     days: int
     max_results: int
@@ -29,7 +29,7 @@ class FetchResult:
     citation: Optional[str]
     submitted_date: datetime
 
-def fetch(config: FetchConfig) -> List[FetchResult]:
+def fetch(config: FetcherConfig) -> List[FetchResult]:
     """
     Fetch paper metadata from arXiv based on categories and date range.
     """
@@ -77,7 +77,7 @@ def fetch(config: FetchConfig) -> List[FetchResult]:
 
 
 if __name__ == "__main__":
-    config = FetchConfig(
+    config = FetcherConfig(
         category="cs.AI",
         days=8,
         max_results=10,
