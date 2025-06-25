@@ -1,10 +1,23 @@
 """Pydantic models with basic validations"""
 
-from pydantic import BaseModel, field_validator
-from typing import Optional, Dict, Any, Union
+from pydantic import BaseModel, field_validator, ConfigDict, model_validator
+from typing import Optional, Dict, Any, Union, List
+import yaml
+from datetime import datetime
+from pathlib import Path
 import os
 
-import pipeline
+from pipeline import (
+    FetcherConfig as FetcherConfig_,
+    ParserConfig as ParserConfig_,
+    ParserVLMConfig as ParserVLMConfig_,
+    RaterConfig as RaterConfig_,
+    RaterEmbedderConfig as RaterEmbedderConfig_,
+    RaterLLMConfig as RaterLLMConfig_,
+    SummarizerConfig as SummarizerConfig_,
+    CacherConfig as CacherConfig_,
+    BatchConfig as BatchConfig_
+)
 
 arxiv_categories = ["cs.AI","cs.AR","cs.CC","cs.CE","cs.CG","cs.CL","cs.CR","cs.CV","cs.CY","cs.DB","cs.DL",
                     "cs.DM","cs.DS","cs.ET","cs.FL","cs.GL","cs.GR","cs.GT","cs.HC","cs.IR","cs.IT","cs.LG",
@@ -27,43 +40,60 @@ arxiv_categories = ["cs.AI","cs.AR","cs.CC","cs.CE","cs.CG","cs.CL","cs.CR","cs.
                     "q-fin.TR","stat.AP","stat.CO","stat.ME","stat.ML","stat.OT","stat.TH"]
 
 recognized_providers = {
-    "Dashscope": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    "DeepSeek": "https://api.deepseek.com/v1",
-    "Ollama": "http://localhost:11434",
-    "OpenAI": "https://api.openai.com/v1",
-    "MiniMax": "https://api.minimaxi.com/v1/text/chatcompletion_v2",
-    "Moonshot": "https://api.moonshot.cn/v1",
-    "SiliconFlow": "https://api.siliconflow.cn/v1",
-    "VolcEngine": "https://ark.cn-beijing.volces.com/api/v3"
+    "dashscope": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "deepseek": "https://api.deepseek.com/v1",
+    "ollama": "http://localhost:11434",
+    "openai": "https://api.openai.com/v1",
+    "minimax": "https://api.minimaxi.com/v1/text/chatcompletion_v2",
+    "moonshot": "https://api.moonshot.cn/v1",
+    "siliconflow": "https://api.siliconflow.cn/v1",
+    "volcengine": "https://ark.cn-beijing.volces.com/api/v3"
 }
 
 valid_options = {
-    "frequency_penalty": (-2,2),
+    "frequency_penalty": (-2.0,2.0),
     "max_tokens": (1,None),
     "presence_penalty": (-2,2),
     "stop": (None, None), # No validation for stop
-    "temperature": (0,2),
-    "top_p": (0,1),
-    "top_k": (0,1),
+    "temperature": (0.0,2.0),
+    "top_p": (0.0,1.0),
+    "top_k": (1,None),
     "top_logprobs": (0,5)
 }
 
 
 class RuntimeConfig(BaseModel):
-    texlive_root: str
-    docker_mount_cache: str
-    docker_mount_output: str
+    texlive_root: Optional[str]=None
+    docker_mount_cache: str = "~/.cache/arxiv-autosumm"
+    docker_mount_output: str = "~/arxiv_summaries"
 
 class RunConfig(BaseModel):
     schedule: str
-    autostart: bool
-    categories: Dict[str]
+    autostart: bool=True
+    categories: List[str]
+    send_log: bool=False
+
+    @field_validator('schedule')
+    @classmethod
+    def validate_cron_schedule(cls, v) -> str:
+        parts = v.split()
+        if len(parts) != 5:
+            raise ValueError("Schedule must be in cron format (5 fields)")
+        return v
+    
+    @field_validator('categories')
+    @classmethod
+    def validate_categories(cls, v) -> List[str]:
+        for category in v:
+            if category not in arxiv_categories:
+                raise ValueError(f"Invalid arXiv category: {category}")
+        return v
 
 class FetcherConfig(BaseModel):
     category: str
-    days: Optional[int]=8
-    max_results: Optional[int]=1000
-    max_retries: Optional[int]=10
+    days: int=8
+    max_results: int=1000
+    max_retries: int=10
 
     @field_validator('category')
     @classmethod
@@ -75,20 +105,20 @@ class FetcherConfig(BaseModel):
     @field_validator('days')
     @classmethod
     def validate_days(cls, v) -> int:
-        return max(1,min(v,100)) if v is not None else 8
+        return max(1,min(v,100))
 
     @field_validator('max_results')
     @classmethod
     def validate_max_results(cls, v) -> int:
-        return max(1,min(v,1000)) if v is not None else 1000
+        return max(1,min(v,1000))
     
     @field_validator('max_retries')
     @classmethod
     def validate_max_retries(cls,v) -> int:
-        return max(1,min(v,100)) if v is not None else 5
+        return max(1,min(v,100))
     
-    def to_pipeline_config(self) -> pipeline.FetcherConfig:
-        return pipeline.FetcherConfig(
+    def to_pipeline_config(self) -> 'FetcherConfig_':
+        return FetcherConfig_(
             category=self.category,
             days=self.days,
             max_results=self.max_results,
@@ -96,71 +126,67 @@ class FetcherConfig(BaseModel):
         )
 
 class SummarizerConfig(BaseModel):
-    provider: Optional[str]
-    api_key: Optional[str]
-    base_url: Optional[str]
+    provider: Optional[str]=None
+    api_key: Optional[str]=None
+    base_url: Optional[str]=None
     model: str
-    batch: Optional[bool]=False
+    batch: bool=False
     system_prompt: Optional[str]=None
     user_prompt_template: str
-    completion_options: Optional[Dict[str,Any]]=None
-    context_length: Optional[int]=65536
+    completion_options: Dict[str,Any]={"temperature": 0.6}
+    context_length: int=98304
 
     @field_validator('provider')
     @classmethod
     def validate_provider(cls, v, info) -> str:
-        if not v and not info.data.get('base_url'):
-            raise ValueError("Either provider of base_url must be specified")
-        if v and not info.data.get('base_url') and v not in recognized_providers:
-            raise ValueError(f"Provider must be one of: {list(recognized_providers.keys())} if base_url is not provided.")
-        return v
+        """
+        if base_url is provided, provider is not required;
+        if base_url is not provided, then provider is required, and provider.lower() must be in recognized_providers
+        """
+        if 'base_url' in info.data: # if base_url is provided, provider can be anything
+            return v
+        if v.lower() not in recognized_providers:
+            raise ValueError(f"Provider '{v}' not recognized. Use one of: {list(recognized_providers.keys())} if you don't want to specify base_url.")
 
     @field_validator('api_key')
     @classmethod
     def validate_api_key(cls, v, info) -> str:
-        if v and v.startswith('env:'):
-            env_var = v[4:]
-            v = os.getenv(env_var)
-            if not v:
-                raise ValueError(f"Environment variable {env_var} not found")
-        
-        provider = info.data.get('provider')
-        base_url = info.data.get('base_url')
+        """
+        if provider is ollama, or base_url starts with "http://localhost", then api_key is not required; required otherwise
+        """
+        provider = info.data.get('provider','').lower()
+        base_url = info.data.get('base_url','')
 
-        if not v and provider != 'Ollama' and not (base_url and base_url.startswith('http://localhost')):
-            raise ValueError("api_key is required for non-local providers")
+        # API key not required for local models
+        if provider == "ollama" or base_url.startswith('http://localhost'):
+            return v
+        
+        if not v:
+            raise ValueError(f"API key is required for provider '{provider}'")
         
         return v
 
     @field_validator('base_url')
     @classmethod
     def validate_base_url(cls, v, info) -> str:
-        """
-        if provider is given and is in recognized_providers, then base_url is not required
-        """
-        provider = info.data.get('provider')
-        if not v and provider not in recognized_providers:
+        """Auto-fill base_url from recognized providers if not provided"""
+        if v: # if base_url is provided, just use it
+            return v
+        
+        provider = info.data.get('provider','').lower()
+        if provider in recognized_providers:
             return recognized_providers[provider]
-        return v
-    
-    @field_validator('system_prompt')
-    @classmethod
-    def validate_system_prompt(cls, v) -> str:
-        if v is None:
-            return ""
-        if v.startswith("file:"):
-            filepath = v[5:]
-            try:
-                with open(filepath, 'r') as f:
-                    return f.read()
-            except Exception as e:
-                raise ValueError(f"Failed to load system prompt file in {filepath}: {e}")
-        return v
+        
+        raise ValueError(f"base_url required for unrecognized provider '{provider}'")
     
     @field_validator('user_prompt_template')
     @classmethod
     def validate_user_prompt_template(cls, v) -> str:
-        return cls.validate_system_prompt(v)
+        """must have {paper_content} placeholder"""
+        if '{paper_content}' not in v:
+            raise ValueError("user_prompt_template must contain '{paper_content}' placeholder")
+
+        return v
 
     @field_validator('completion_options')
     @classmethod
@@ -179,10 +205,10 @@ class SummarizerConfig(BaseModel):
     @field_validator('context_length')
     @classmethod
     def validate_context_length(cls, v) -> int:
-        return max(512,v)
+        return max(3072,v)
     
-    def to_pipeline_config(self) -> pipeline.SummarizerConfig:
-        return pipeline.SummarizerConfig(
+    def to_pipeline_config(self) -> 'SummarizerConfig_':
+        return SummarizerConfig_(
             provider=self.provider,
             api_key=self.api_key,
             base_url=self.base_url,
@@ -195,119 +221,445 @@ class SummarizerConfig(BaseModel):
         )
         
 class RaterEmbedderConfig(BaseModel):
-    provider: Optional[str]
-    api_key: Optional[str]
-    base_url: Optional[str]
+    provider: Optional[str]=None
+    api_key: Optional[str]=None
+    base_url: Optional[str]=None
     model: str
-    query_template: str
+    query_template: str="High-quality {user_interests} research paper with novel contributions, rigorous methodology, clear presentation, and significant impact"
     user_interests: Optional[str]=None
-    context_length: Optional[int]=2048
+    context_length: int=2048
 
     @field_validator('provider')
     @classmethod
     def validate_provider(cls, v, info) -> str:
-        if not v and not info.data.get('base_url'):
-            raise ValueError("Either provider of base_url must be specified")
-        if v and not info.data.get('base_url') and v not in recognized_providers:
-            raise ValueError(f"Provider must be one of: {list(recognized_providers.keys())} if base_url is not provided.")
-        return v
+        """
+        if base_url is provided, provider is not required;
+        if base_url is not provided, then provider is required, and provider.lower() must be in recognized_providers
+        """
+        if 'base_url' in info.data: # if base_url is provided, provider can be anything
+            return v
+        if v.lower() not in recognized_providers:
+            raise ValueError(f"Provider '{v}' not recognized. Use one of: {list(recognized_providers.keys())} if you don't want to specify base_url.")
 
     @field_validator('api_key')
     @classmethod
     def validate_api_key(cls, v, info) -> str:
-        if v and v.startswith('env:'):
-            env_var = v[4:]
-            v = os.getenv(env_var)
-            if not v:
-                raise ValueError(f"Environment variable {env_var} not found")
-        
-        provider = info.data.get('provider')
-        base_url = info.data.get('base_url')
+        """
+        if provider is ollama, or base_url starts with "http://localhost", then api_key is not required; required otherwise
+        """
+        provider = info.data.get('provider','').lower()
+        base_url = info.data.get('base_url','')
 
-        if not v and provider != 'Ollama' and not (base_url and base_url.startswith('http://localhost')):
-            raise ValueError("api_key is required for non-local providers")
+        # API key not required for local models
+        if provider == "ollama" or base_url.startswith('http://localhost'):
+            return v
+        
+        if not v:
+            raise ValueError(f"API key is required for provider '{provider}'")
         
         return v
 
     @field_validator('base_url')
     @classmethod
     def validate_base_url(cls, v, info) -> str:
-        """
-        if provider is given and is in recognized_providers, then base_url is not required
-        """
-        provider = info.data.get('provider')
-        if not v and provider not in recognized_providers:
+        """Auto-fill base_url from recognized providers if not provided"""
+        if v: # if base_url is provided, just use it
+            return v
+        
+        provider = info.data.get('provider','').lower()
+        if provider in recognized_providers:
             return recognized_providers[provider]
-        return v
+        
+        raise ValueError(f"base_url required for unrecognized provider '{provider}'")
 
     @field_validator('query_template')
     @classmethod
-    def validate_query_template(cls, v):
-        pass
+    def validate_query_template(cls, v, info) -> int:
+        if 'user_interests' not in info.data:
+            return v
+        if '{user_interests}' not in v:
+            raise ValueError("query_template must include '{user_interests}' placeholder if user_interests is given.")
+        return v
+    
+    @field_validator('context_length')
+    @classmethod
+    def validate_context_length(cls, v) -> int:
+        return max(512,v)
+    
+    def to_pipeline_config(self) -> 'RaterEmbedderConfig_':
+        return RaterEmbedderConfig_(
+            provider=self.provider,
+            api_key=self.api_key,
+            base_url=self.base_url,
+            query_template=self.query_template,
+            user_interests=self.user_interests,
+            context_length=self.context_length
+        )
 
 class RaterLLMConfig(BaseModel):
-    provider: Optional[str]
-    api_key: Optional[str]
-    base_url: Optional[str]
+    provider: Optional[str]=None
+    api_key: Optional[str]=None
+    base_url: Optional[str]=None
     model: str
-    batch: Optional[bool]=False
+    batch: bool=False
     system_prompt: Optional[str]=None
     user_prompt_template: str
-    completion_options: Optional[Dict[str,Any]]=None
+    completion_options: Dict[str,Any]={"temperature": 0.2, "max_tokens": 1024}
     context_length: Optional[int]=65536
-    criteria: Dict[str,Dict[str,Union[str,float]]]
+    criteria: Dict[str,Dict[str,Union[str,float]]]={"novelty": {"description": "How original and innovative are the contributions?", "weight": 0.3}, "clarity": {"description": "How well-written and understandable is the paper?", "weight": 0.2}}
+
+    @field_validator('provider')
+    @classmethod
+    def validate_provider(cls, v, info) -> str:
+        """
+        if base_url is provided, provider is not required;
+        if base_url is not provided, then provider is required, and provider.lower() must be in recognized_providers
+        """
+        if 'base_url' in info.data: # if base_url is provided, provider can be anything
+            return v
+        if v.lower() not in recognized_providers:
+            raise ValueError(f"Provider '{v}' not recognized. Use one of: {list(recognized_providers.keys())} if you don't want to specify base_url.")
+
+    @field_validator('api_key')
+    @classmethod
+    def validate_api_key(cls, v, info) -> str:
+        """
+        if provider is ollama, or base_url starts with "http://localhost", then api_key is not required; required otherwise
+        """
+        provider = info.data.get('provider','').lower()
+        base_url = info.data.get('base_url','')
+
+        # API key not required for local models
+        if provider == "ollama" or base_url.startswith('http://localhost'):
+            return v
+        
+        if not v:
+            raise ValueError(f"API key is required for provider '{provider}'")
+        
+        return v
+
+    @field_validator('base_url')
+    @classmethod
+    def validate_base_url(cls, v, info) -> str:
+        """Auto-fill base_url from recognized providers if not provided"""
+        if v: # if base_url is provided, just use it
+            return v
+        
+        provider = info.data.get('provider','').lower()
+        if provider in recognized_providers:
+            return recognized_providers[provider]
+        
+        raise ValueError(f"base_url required for unrecognized provider '{provider}'")
+
+    @field_validator('user_prompt_template')
+    @classmethod
+    def validate_user_prompt_template(cls, v) -> str:
+        """
+        if starts with 'file:', try to load from file;
+        must contain '{paper_text}' and '{criteria_text}' placeholders
+        """
+        for placeholder in ['{paper_text}','{criteria_text}']:
+            if placeholder not in v:
+                raise ValueError(f"user_prompt_template must contain '{placeholder}'")
+        
+        return v
+
+    @field_validator('completion_options')
+    @classmethod
+    def validate_completion_options(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+        filtered = {}
+        for key, value in v.items():
+            if key in valid_options:
+                min_val, max_val = valid_options[key]
+                if min_val is not None and max_val is not None:
+                    filtered[key] = max(min_val, min(value, max_val))
+                else:
+                    filtered[key] = value
+        return filtered
+
+    @field_validator('context_length')
+    @classmethod
+    def validate_context_length(cls, v) -> int:
+        return max(2048, v)
+    
+    def to_pipeline_config(self):
+        return RaterLLMConfig_(
+            provider=self.provider,
+            api_key=self.api_key,
+            base_url=self.base_url,
+            model=self.model,
+            batch=self.batch,
+            system_prompt=self.system_prompt,
+            user_prompt_template=self.user_prompt_template,
+            completion_options=self.completion_options,
+            context_length=self.context_length,
+            criteria=self.criteria
+        )
 
 class RaterConfig(BaseModel):
-    top_k: Optional[int]=200
-    embedder: Optional[RaterEmbedderConfig]
-    llm: Optional[RaterLLMConfig]
+    top_k: int=200
+    embedder: Optional[RaterEmbedderConfig]=None
+    llm: Optional[RaterLLMConfig]=None
+    """
+    if top_k is 0, then RaterLLMConfig is not required; if top_k is 1000, then RaterEmbedderConfig is not required
+    """
+
+    @field_validator('top_k')
+    @classmethod
+    def validate_top_k(cls, v) -> int:
+        return max(0, min(v,1000))
+    
+    @field_validator('embedder')
+    @classmethod
+    def validate_embedder(cls, v, info):
+        top_k = info.data.get('top_k', 200)
+        if top_k > 0 and v is None:
+            raise ValueError("embedder config required when top_k > 0. To use llm for rating entirely, set top_k to 0")
+        return v
+    
+    @field_validator('llm')
+    @classmethod
+    def validate_llm(cls, v, info):
+        top_k = info.data.get('top_k',200)
+        if top_k < 1000 and v is None:
+            raise ValueError("llm config required when top_k < 1000. To use embedder for rating entirely, set top_k to 1000")
+        return v
+    
+    def to_pipeline_config(self):
+        return RaterConfig_(
+            top_k=self.top_k,
+            embedder=self.embedder.to_pipeline_config() if self.embedder else None,
+            llm=self.llm.to_pipeline_config() if self.llm else None
+        )
 
 class ParserVLMConfig(BaseModel):
-    provider: Optional[str]
-    api_key: Optional[str]
-    base_url: Optional[str]
+    provider: Optional[str]=None
+    api_key: Optional[str]=None
+    base_url: Optional[str]=None
     model: str
     batch: Optional[bool]=False
     system_prompt: Optional[str]=None
     user_prompt: str
+    completion_options: Dict[str,Any]={"temperature": 0.2}
     dpi: Optional[int]=168
+
+    @field_validator('provider')
+    @classmethod
+    def validate_provider(cls, v, info) -> str:
+        """
+        if base_url is provided, provider is not required;
+        if base_url is not provided, then provider is required, and provider.lower() must be in recognized_providers
+        """
+        if 'base_url' in info.data: # if base_url is provided, provider can be anything
+            return v
+        if v.lower() not in recognized_providers:
+            raise ValueError(f"Provider '{v}' not recognized. Use one of: {list(recognized_providers.keys())} if you don't want to specify base_url.")
+
+    @field_validator('api_key')
+    @classmethod
+    def validate_api_key(cls, v, info) -> str:
+        """
+        if provider is ollama, or base_url starts with "http://localhost", then api_key is not required; required otherwise
+        """
+        provider = info.data.get('provider','').lower()
+        base_url = info.data.get('base_url','')
+
+        # API key not required for local models
+        if provider == "ollama" or base_url.startswith('http://localhost'):
+            return v
+        
+        if not v:
+            raise ValueError(f"API key is required for provider '{provider}'")
+        
+        return v
+
+    @field_validator('base_url')
+    @classmethod
+    def validate_base_url(cls, v, info) -> str:
+        """Auto-fill base_url from recognized providers if not provided"""
+        if v: # if base_url is provided, just use it
+            return v
+        
+        provider = info.data.get('provider','').lower()
+        if provider in recognized_providers:
+            return recognized_providers[provider]
+        
+        raise ValueError(f"base_url required for unrecognized provider '{provider}'")    
+    
+    @field_validator('completion_options')
+    @classmethod
+    def validate_completion_options(cls, v) -> Dict[str,Any]:
+        filtered = {}
+        for key, value in v.items():
+            if key in valid_options:
+                min_val, max_val = valid_options[key]
+                if min_val is not None and max_val is not None:
+                    filtered[key] = max(min_val,min(value,max_val))
+                else:
+                    filtered[key] = value
+
+        return filtered
+
+    @field_validator('dpi')
+    @classmethod
+    def validate_dpi(cls, v: int) -> int:
+        return max(36, min(v, 400))
+    
+    def to_pipeline_config(self):
+        return ParserVLMConfig_(
+            provider=self.provider,
+            api_key=self.api_key,
+            base_url=self.base_url,
+            model=self.model,
+            batch=self.batch,
+            system_prompt=self.system_prompt,
+            user_prompt=self.user_prompt,
+            completion_options=self.completion_options,
+            dpi=self.dpi
+        )
 
 class ParserConfig(BaseModel):
     enable_vlm: Optional[bool]=False
     tmp_dir: Optional[str]="./tmp"
-    vlm: Optional[ParserVLMConfig]
+    vlm: Optional[ParserVLMConfig]=None
+    """If enable_vlm is False, then ParserVLMConfig is not required"""
+
+    @field_validator('vlm')
+    @classmethod
+    def validate_vlm_required(cls, v: Optional[ParserVLMConfig], info):
+        enable_vlm = info.data.get('enable_vlm', False)
+        if enable_vlm and v is None:
+            raise ValueError("vlm config required when enable_vlm is True")
+        return v
+    
+    def to_pipeline_config(self):
+        return ParserConfig_(
+            enable_vlm=self.enable_vlm,
+            tmp_dir=self.tmp_dir,
+            vlm=self.vlm.to_pipeline_config() if self.vlm else None
+        )
 
 class BatchConfig(BaseModel):
-    tmp_dir: Optional[str]="./tmp"
-    max_wait_hours: Optional[int]=24
-    poll_interval_seconds: Optional[int]=30
-    fallback_on_error: Optional[bool]=True
+    tmp_dir: str="./tmp"
+    max_wait_hours: int=24
+    poll_interval_seconds: int=30
+    fallback_on_error: bool=True
+
+    def to_pipeline_config(self):
+        return BatchConfig_(
+            tmp_dir=self.tmp_dir,
+            max_wait_hours=self.max_wait_hours,
+            poll_intervall_seconds=self.poll_interval_seconds,
+            fallback_on_error=self.fallback_on_error
+        )
 
 class CacherConfig(BaseModel):
-    dir: Optional[str]="~/.cache/arxiv-autosumm"
-    ttl_days: Optional[int]=16
+    dir: str="~/.cache/arxiv-autosumm"
+    ttl_days: int=16
 
-class RendererConfig:
-    formats: str
+    def to_pipeline_config(self):
+        return CacherConfig_(
+            dir=self.dir,
+            ttl_days=self.ttl_days
+        )
 
-class DelivererConfig:
+class RendererConfig(BaseModel):
+    formats: List[str]=["pdf","md"]
+    """Not implemented, skip this"""
+
+    def to_pipeline_config(self):
+        pass
+
+class DelivererConfig(BaseModel):
     smtp_server: str
     port: int 
     sender: str
     recipient: str
     password: str
+    max_attachment_size_mb: int=25
+    """Not implemented, skip this"""
 
-class MainConfig:
+    def to_pipeline_config(self):
+        pass
+
+class MainConfig(BaseModel):
+    model_config = ConfigDict(extra='forbid') # prevent unknown fields
+
     runtime: RuntimeConfig
     run: RunConfig
     fetch: FetcherConfig
     summarize: SummarizerConfig
     rate: RaterConfig
     parse: ParserConfig
-    batch: Optional[BatchConfig]
-    cache: Optional[CacherConfig]
+    batch: BatchConfig=BatchConfig()
+    cache: CacherConfig=CacherConfig()
     render: RendererConfig
     deliver: DelivererConfig
+    """If batch or cache is not provided or is None, go with default settings."""
+
+    @classmethod
+    def from_yaml(cls, path: str) -> 'MainConfig':
+        with open(path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+
+        data = cls._resolve_references(data)
+
+        return cls(**data)
+    
+    def to_yaml(self, path: str) -> None:
+        Path(path).parent.mkdir(parents=True,exist_ok=True)
+
+        with open(path,'w', encoding='utf-8') as f:
+            yaml.dump(
+                self.model_dump(exclude_none=True),
+                f,
+                default_flow_style=False,
+                sort_keys=False,
+                indent=2
+            )
+
+    @staticmethod
+    def _resolve_references(data: Dict[str,Any]) -> Dict[str, Any]:
+        """Recursively resolve 'file:path' and 'env:variable' references"""
+        if isinstance(data, dict):
+            result = {}
+            for key, value in data.items():
+                if isinstance(value, str) and value.startswith('file:'):
+                    filepath = value[5:]
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            result[key] = f.read()
+                    except Exception as e:
+                        raise ValueError(f"Failed to load file {filepath}: {e}")
+                elif isinstance(value, str) and value.startswith('env:'):
+                    envname = value[4:]
+                    try:
+                        result[key] = os.getenv(envname)
+                    except Exception as e:
+                        raise ValueError(f"Failed to get environmental variable {envname}: {e}")
+                else:
+                    result[key] = MainConfig._resolve_references(value)
+            return result
+        elif isinstance(data, list):
+            return [MainConfig._resolve_references(item) for item in data]
+        else:
+            return data
+        
+    def get_pipeline_configs(self) -> Dict[str, Any]:
+        """Convert all configs to pipeline dataclasses"""
+        return {
+            "fetch": self.fetch.to_pipeline_config(),
+            "summarize": self.summarize.to_pipeline_config(),
+            "rate": self.rate.to_pipeline_config(),
+            "parse": self.parse.to_pipeline_config(),
+            "batch": self.batch.to_pipeline_config(),
+            "cache": self.cache.to_pipeline_config(),
+            "render": self.render.to_pipeline_config(),
+            "deliver": self.deliver.to_pipeline_config()
+        }
+
+
+
 
 
 

@@ -13,3 +13,4 @@ def run():
 @app.command()
 def test_config():
     """Test API connectivity, model availability and email connectivity."""
+    import pipeline as pl

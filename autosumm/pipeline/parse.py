@@ -6,7 +6,7 @@ import os
 import re
 import requests
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 import fitz
 import base64
@@ -28,6 +28,7 @@ class ParserVLMConfig:
                 Your mission is to analyze the image document and generate the result in markdown format, use markdown syntax to preserve the title level of the original document.
                 You should not include page numbers for better readability."""
     user_prompt: str="""Extract the text from the above document as if you were reading it naturally."""
+    completion_options: Dict[str,Any]={"temperature": 0.2}
     dpi: int=160
 
 @dataclass
@@ -161,14 +162,22 @@ class ParserVLMClient(BaseClient):
             ]
         })
 
-        payload = {
+        base_payload = {
             "model": self.config.model,
             "messages": messages,
             "max_tokens": 8192,
             "stream": True
         }
 
-        return payload
+        if "ollama" in self.config.provider.lower():
+            options = self.config.completion_options.copy()
+            if 'max_tokens' in options:
+                options['num_predict'] = options.pop('max_tokens')
+            base_payload["options"] = options
+        else:
+            base_payload.update(self.config.completion_options)
+
+        return base_payload
     
     def _parse_response(self, response_content: str) -> str:
         return response_content.strip()
