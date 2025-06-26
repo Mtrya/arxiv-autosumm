@@ -19,23 +19,21 @@ except:
 
 @dataclass
 class ParserVLMConfig:
-    provider: str="ollama"
+    provider: Optional[str]=None
     api_key: Optional[str]=None
-    base_url: str="http://localhost:11434"
-    model: str="benhaotang/Nanonets-OCR-s:latest"
+    base_url: Optional[str]=None
+    model: str
     batch: bool=False
-    system_prompt: str="""You are an AI specialized in recognizing and extracting text. 
-                Your mission is to analyze the image document and generate the result in markdown format, use markdown syntax to preserve the title level of the original document.
-                You should not include page numbers for better readability."""
-    user_prompt: str="""Extract the text from the above document as if you were reading it naturally."""
+    system_prompt: Optional[str]=None
+    user_prompt: str
     completion_options: Dict[str,Any]={"temperature": 0.2}
-    dpi: int=160
+    dpi: int=168
 
 @dataclass
 class ParserConfig:
-    enable_vlm: bool=True
+    enable_vlm: bool=False
     tmp_dir: str="./tmp"
-    vlm: Optional[ParserVLMConfig]=field(default_factory=ParserVLMConfig)
+    vlm: Optional[ParserVLMConfig]=None
 
 @dataclass
 class ImageData:

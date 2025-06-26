@@ -7,16 +7,14 @@ from dataclasses import dataclass
 from typing import List, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
-import requests
 import arxiv
 import time
 
 @dataclass
 class FetcherConfig:
-    category: str
-    days: int
-    max_results: int
-    max_retries: int
+    days: int=8
+    max_results: int=1000
+    max_retries: int=10
 
 @dataclass
 class FetchResult:
@@ -29,7 +27,7 @@ class FetchResult:
     citation: Optional[str]
     submitted_date: datetime
 
-def fetch(config: FetcherConfig) -> List[FetchResult]:
+def fetch(category: str, config: FetcherConfig) -> List[FetchResult]:
     """
     Fetch paper metadata from arXiv based on categories and date range.
     """
@@ -41,7 +39,7 @@ def fetch(config: FetcherConfig) -> List[FetchResult]:
     end_date_str = end_date.strftime("%Y%m%d")
 
     date_query = f'submittedDate:[{start_date_str} TO {end_date_str}]'
-    full_query = f'{config.category} AND {date_query}'
+    full_query = f'{category} AND {date_query}'
 
     search = arxiv.Search(
         query=full_query,

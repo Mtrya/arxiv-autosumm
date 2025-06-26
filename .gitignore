@@ -4,3 +4,4 @@ downloads/
 tmp/
 __pycache__
 config.yaml
+test_output

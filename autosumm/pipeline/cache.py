@@ -1,6 +1,6 @@
 """
 SQLite-based caching system for ArXiv summarization pipeline.
-Caches similarity scores, rating scores, summaries, and processed papers.
+Caches similarity scores, rating scores, and processed papers.
 Handles config change detection and automatic cache invalidation.
 """
 
@@ -15,8 +15,8 @@ from typing import Optional, Tuple, Dict, Any
 
 @dataclass
 class CacherConfig:
-    dir: str
-    ttl_days: int
+    dir: str="~/.cache/arxiv-autosumm"
+    ttl_days: int=16
 
 class Cacher:
     def __init__(self, config: CacherConfig):
@@ -159,7 +159,7 @@ class Cacher:
         conn.commit()
         conn.close()
     
-    # Summaries (stored as files)
+    # Summaries (stored as files, not used)
     def get_summary(self, arxiv_id: str) -> Optional[str]:
         """Get cached summary for paper."""
         conn = sqlite3.connect(self.db_path)

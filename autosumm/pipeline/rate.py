@@ -17,22 +17,22 @@ except:
 
 @dataclass
 class RaterEmbedderConfig:
-    provider: str
-    api_key: Optional[str]
-    base_url: str
+    provider: Optional[str]=None
+    api_key: Optional[str]=None
+    base_url: Optional[str]=None
     model: str
-    query_template: str
-    user_interests: str
-    context_length: Optional[int]=None
+    query_template: str="High-quality {user_interests} research paper with novel contributions, rigorous methodology, clear presentation and significant impact."
+    user_interests: Optional[str]=None
+    context_length: int=2048
 
 @dataclass
 class RaterLLMConfig:
-    provider: str
+    provider: Optional[str]
     api_key: Optional[str]
-    base_url: str
+    base_url: Optional[str]
     model: str
-    batch: bool
-    system_prompt: str
+    batch: bool=False
+    system_prompt: Optional[str]=None
     user_prompt_template: str
     completion_options: Dict[str,Any]
     context_length: Optional[int]

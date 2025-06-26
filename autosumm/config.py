@@ -6,6 +6,7 @@ import yaml
 from datetime import datetime
 from pathlib import Path
 import os
+import re
 
 from pipeline import (
     FetcherConfig as FetcherConfig_,
@@ -16,7 +17,8 @@ from pipeline import (
     RaterLLMConfig as RaterLLMConfig_,
     SummarizerConfig as SummarizerConfig_,
     CacherConfig as CacherConfig_,
-    BatchConfig as BatchConfig_
+    BatchConfig as BatchConfig_,
+    DelivererConfig as DelivererConfig_ 
 )
 
 arxiv_categories = ["cs.AI","cs.AR","cs.CC","cs.CE","cs.CG","cs.CL","cs.CR","cs.CV","cs.CY","cs.DB","cs.DL",
@@ -90,17 +92,9 @@ class RunConfig(BaseModel):
         return v
 
 class FetcherConfig(BaseModel):
-    category: str
     days: int=8
     max_results: int=1000
     max_retries: int=10
-
-    @field_validator('category')
-    @classmethod
-    def validate_category(cls, v) -> str:
-        if v not in arxiv_categories:
-            raise ValueError("category must be a valid arXiv category")
-        return v
 
     @field_validator('days')
     @classmethod
@@ -225,7 +219,7 @@ class RaterEmbedderConfig(BaseModel):
     api_key: Optional[str]=None
     base_url: Optional[str]=None
     model: str
-    query_template: str="High-quality {user_interests} research paper with novel contributions, rigorous methodology, clear presentation, and significant impact"
+    query_template: str="High-quality {user_interests} research paper with novel contributions, rigorous methodology, clear presentation and significant impact."
     user_interests: Optional[str]=None
     context_length: int=2048
 
@@ -437,11 +431,11 @@ class ParserVLMConfig(BaseModel):
     api_key: Optional[str]=None
     base_url: Optional[str]=None
     model: str
-    batch: Optional[bool]=False
+    batch: bool=False
     system_prompt: Optional[str]=None
     user_prompt: str
     completion_options: Dict[str,Any]={"temperature": 0.2}
-    dpi: Optional[int]=168
+    dpi: int=168
 
     @field_validator('provider')
     @classmethod
@@ -519,7 +513,7 @@ class ParserVLMConfig(BaseModel):
         )
 
 class ParserConfig(BaseModel):
-    enable_vlm: Optional[bool]=False
+    enable_vlm: bool=False
     tmp_dir: Optional[str]="./tmp"
     vlm: Optional[ParserVLMConfig]=None
     """If enable_vlm is False, then ParserVLMConfig is not required"""
@@ -565,6 +559,7 @@ class CacherConfig(BaseModel):
 
 class RendererConfig(BaseModel):
     formats: List[str]=["pdf","md"]
+    output_dir: str
     """Not implemented, skip this"""
 
     def to_pipeline_config(self):
@@ -572,15 +567,41 @@ class RendererConfig(BaseModel):
 
 class DelivererConfig(BaseModel):
     smtp_server: str
-    port: int 
+    port: int=465
     sender: str
     recipient: str
     password: str
-    max_attachment_size_mb: int=25
-    """Not implemented, skip this"""
+    max_attachment_size_mb: float=25.0
 
+    @field_validator('port')
+    @classmethod
+    def validate_port(cls, v: int) -> int:
+        if not (1 <= v <= 65535):
+            raise ValueError("Port must be an integer between 1 and 65536.")
+        return v
+    
+    @field_validator('sender','recipient')
+    @classmethod
+    def validate_email_addresses(cls, v: str) -> str:
+        if '@' not in v or not re.match(r"[^@]+@[^@]+\.[a-zA-Z]{2,}$", v):
+            raise ValueError("Email address format is invalid.")
+        return v
+    
+    @field_validator('max_attachment_size_mb')
+    @classmethod
+    def validate_max_attachment_size_mb(cls, v: float) -> float:
+        return max(0.1,v)
+    
     def to_pipeline_config(self):
-        pass
+        return DelivererConfig_(
+            smtp_server=self.smtp_server,
+            port=self.port,
+            sender=self.sender,
+            recipient=self.recipient,
+            password=self.password,
+            max_attachment_size_mb=self.max_attachment_size_mb
+        )
+
 
 class MainConfig(BaseModel):
     model_config = ConfigDict(extra='forbid') # prevent unknown fields
