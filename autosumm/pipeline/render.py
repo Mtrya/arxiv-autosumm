@@ -29,12 +29,30 @@ class PDFRendererConfig:
     additional_pandoc_args: List[str]=field(default_factory=list)
 
 @dataclass
+class HTMLRendererConfig:
+    math_renderer: str="mathjax"
+    mathjax_url: Optional[str]=None
+    katex_url: Optional[str]=None
+    include_toc: bool=True
+    toc_depth: int=3
+    number_sections: bool=False
+    standalone: bool=True
+    self_contained: bool=False
+    css_file: Optional[str]=None
+    css_inline: Optional[str]=None
+    template_file: Optional[str]=None
+    highlight_style: str="pygments"
+    html5: bool=True
+    additional_pandoc_args: List[str]=field(default_factory=list)
+
+@dataclass
 class RendererConfig:
     formats: List[str]=field(default_factory=lambda: ["pdf","md"]) # allowed formats: pdf, html, md, epub, mp3, wav, ogg
     output_dir: str="./output"
     base_filename: Optional[str]=None # If None, auto-generate timestamp-based name
     markdown: MarkdownRendererConfig=field(default_factory=MarkdownRendererConfig)
     pdf: PDFRendererConfig=field(default_factory=PDFRendererConfig)
+    html: HTMLRendererConfig=field(default_factory=HTMLRendererConfig)
 
 @dataclass
 class RenderResult:
@@ -84,7 +102,6 @@ def render_md(summaries: List[str], category: str, config: RendererConfig) -> Re
         success=True
     )
 
-
 def render_pdf(summaries: List[str], category, config: RendererConfig) -> RenderResult:
     md_result = None
     temp_md_file = None
@@ -99,9 +116,7 @@ def render_pdf(summaries: List[str], category, config: RendererConfig) -> Render
         )
     
     md_file = Path(md_result.path)
-
-    if "md" not in config.formats:
-        temp_md_file = md_file # if markdown is not wanted, remember to clean it up later
+    temp_md_file = md_file
 
     content = md_file.read_text(encoding='utf-8')
 
@@ -148,24 +163,112 @@ def render_pdf(summaries: List[str], category, config: RendererConfig) -> Render
         success=True
     )
 
+def render_html(summaries: List[str], category, config: RendererConfig) -> RenderResult:
+    md_result = None
+    temp_md_file = None
 
+    md_result = render_md(summaries, category, config)
+    if not md_result.success:
+        return RenderResult(
+            path="",
+            format="html",
+            success=False,
+            error=f"Failed to create intermediate markdown: {md_result.error}"
+        )
+    
+    md_file = Path(md_result.path)
+    temp_md_file = md_file
 
-def render_html(summaries: List[str], config: RendererConfig) -> RenderResult:
+    content = md_file.read_text(encoding='utf-8')
+
+    content = re.sub(r'\n{3,}', r'\n\n', content)
+    content = content.replace("\\pagebreak","")
+
+    md_file.write_text(content, encoding='utf-8')
+
+    output_path = _ensure_output_dir(config.output_dir)
+    base_filename = _generate_base_filename(category, config)
+    html_file = output_path / f"{base_filename}.html"
+
+    cmd = [
+        "pandoc",
+        str(md_file),
+        "-f", "gfm",  # GitHub-flavored markdown
+        "-t", "html5" if config.html.html5 else "html",
+        "-o", str(html_file),
+        f"--highlight-style={config.html.highlight_style}"
+    ]
+
+    if config.html.standalone:
+        cmd.append("--standalone")
+    
+    if config.html.include_toc:
+        cmd.extend(["--toc", f"--toc-depth={config.html.toc_depth}"])
+
+    if config.html.number_sections:
+        cmd.append("--number-sections")
+
+    if config.html.math_renderer == "mathjax":
+        if config.html.mathjax_url:
+            cmd.append(f"--mathjax={config.html.mathjax_url}")
+        else:
+            cmd.append("--mathjax")
+    
+    elif config.html.math_renderer == "katex":
+        if config.html.katex_url:
+            cmd.append(f"--katex={config.html.katex_url}")
+        else:
+            cmd.append("--katex")
+
+    elif config.html_renderer == "mathml":
+        cmd.append("--mathml")
+    elif config.html.renderer == "webtex":
+        cmd.append("--webtex")
+
+    if config.html.self_contained:
+        cmd.append("--self-contained")
+    
+    if config.html.css_file:
+        cmd.extend(["--css", config.html.css_file])
+    
+    if config.html.css_inline:
+        temp_css = output_path / f"temp_{base_filename}.css"
+        temp_css.write_text(config.html.css_inline, encoding='utf-8')
+        cmd.extend(["--css", str(temp_css)])
+
+    if config.html.template_file:
+        cmd.extend(["--template", config.html.template_file])
+    
+    cmd.extend(config.html.additional_pandoc_args)
+
+    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+
+    # Clean up temporary files
+    if config.html.css_inline:
+        temp_css = output_path / f"temp_{base_filename}.css"
+        temp_css.unlink(missing_ok=True)
+    if temp_md_file and temp_md_file.exists():
+        temp_md_file.unlink()
+
+    return RenderResult(
+        path=str(html_file),
+        format="html",
+        success=True
+    )
+
+def render_epub(summaries: List[str], category, config: RendererConfig) -> RenderResult:
     pass
 
-def render_epub(summaries: List[str], config: RendererConfig) -> RenderResult:
+def render_mp3(summaries: List[str], category, config: RendererConfig) -> RenderResult:
     pass
 
-def render_mp3(summaries: List[str], config: RendererConfig) -> RenderResult:
+def render_wav(summaries: List[str], category, config: RendererConfig) -> RenderResult:
     pass
 
-def render_wav(summaries: List[str], config: RendererConfig) -> RenderResult:
+def render_ogg(summaries: List[str], category, config: RendererConfig) -> RenderResult:
     pass
 
-def render_ogg(summaries: List[str], config: RendererConfig) -> RenderResult:
-    pass
-
-def render(summaries: List[str],category: str, config: RendererConfig) -> List[RenderResult]:
+def render(summaries: List[str], category: str, config: RendererConfig) -> List[RenderResult]:
     """Main entry point - delegates to format-specific renderers"""
     results = []
 
@@ -178,7 +281,12 @@ def render(summaries: List[str],category: str, config: RendererConfig) -> List[R
         )
         return [error_result]
 
-    for format_name in config.formats:
+    # move "md" to end of config.formats
+    reordered_formats = [f for f in config.formats if f != "md"]
+    if "md" in config.formats:
+        reordered_formats.append("md")
+
+    for format_name in reordered_formats:
         if format_name == "md":
             result = render_md(summaries, category, config)
         elif format_name == "pdf":
@@ -211,7 +319,7 @@ if __name__ == "__main__":
     ]
     
     config = RendererConfig(
-        formats=["md", "pdf"],
+        formats=["md", "pdf", "html"],
         output_dir="./test_output"
     )
     
