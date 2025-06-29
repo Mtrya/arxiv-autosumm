@@ -13,10 +13,10 @@ from dataclasses import dataclass
 
 @dataclass
 class BatchConfig:
-    tmp_dir: str="./tmp"
-    max_wait_hours: int=24
-    poll_intervall_seconds: int=30
-    fallback_on_error: bool=True
+    tmp_dir: str
+    max_wait_hours: int
+    poll_intervall_seconds: int
+    fallback_on_error: bool
 
 class BaseClient(ABC):
     def __init__(self, config, batch_config: Optional[BatchConfig]=None):

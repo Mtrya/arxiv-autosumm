@@ -19,21 +19,21 @@ except:
 
 @dataclass
 class ParserVLMConfig:
-    provider: Optional[str]=None
-    api_key: Optional[str]=None
-    base_url: Optional[str]=None
+    provider: Optional[str]
+    api_key: Optional[str]
+    base_url: Optional[str]
     model: str
-    batch: bool=False
-    system_prompt: Optional[str]=None
+    batch: bool
+    system_prompt: str
     user_prompt: str
-    completion_options: Dict[str,Any]={"temperature": 0.2}
+    completion_options: Dict[str,Any]
     dpi: int=168
 
 @dataclass
 class ParserConfig:
-    enable_vlm: bool=False
-    tmp_dir: str="./tmp"
-    vlm: Optional[ParserVLMConfig]=None
+    enable_vlm: bool
+    tmp_dir: str
+    vlm: Optional[ParserVLMConfig]
 
 @dataclass
 class ImageData:

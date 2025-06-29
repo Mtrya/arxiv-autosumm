@@ -18,7 +18,12 @@ from pipeline import (
     SummarizerConfig as SummarizerConfig_,
     CacherConfig as CacherConfig_,
     BatchConfig as BatchConfig_,
-    DelivererConfig as DelivererConfig_ 
+    DelivererConfig as DelivererConfig_,
+    RendererConfig as RendererConfig_,
+    MarkdownRendererConfig as MarkdownRendererConfig_,
+    PDFRendererConfig as PDFRendererConfig_,
+    HTMLRendererConfig as HTMLRendererConfig_,
+    AZW3RendererConfig as AZW3RendererConfig_
 )
 
 arxiv_categories = ["cs.AI","cs.AR","cs.CC","cs.CE","cs.CG","cs.CL","cs.CR","cs.CV","cs.CY","cs.DB","cs.DL",
@@ -113,7 +118,6 @@ class FetcherConfig(BaseModel):
     
     def to_pipeline_config(self) -> 'FetcherConfig_':
         return FetcherConfig_(
-            category=self.category,
             days=self.days,
             max_results=self.max_results,
             max_retries=self.max_retries
@@ -148,7 +152,7 @@ class SummarizerConfig(BaseModel):
         """
         if provider is ollama, or base_url starts with "http://localhost", then api_key is not required; required otherwise
         """
-        provider = info.data.get('provider','').lower()
+        provider = info.data.get('provider','').lower() if info.data.get('provider') else ''
         base_url = info.data.get('base_url','')
 
         # API key not required for local models
@@ -223,56 +227,13 @@ class RaterEmbedderConfig(BaseModel):
     user_interests: Optional[str]=None
     context_length: int=2048
 
-    @field_validator('provider')
-    @classmethod
-    def validate_provider(cls, v, info) -> str:
-        """
-        if base_url is provided, provider is not required;
-        if base_url is not provided, then provider is required, and provider.lower() must be in recognized_providers
-        """
-        if 'base_url' in info.data: # if base_url is provided, provider can be anything
-            return v
-        if v.lower() not in recognized_providers:
-            raise ValueError(f"Provider '{v}' not recognized. Use one of: {list(recognized_providers.keys())} if you don't want to specify base_url.")
-
-    @field_validator('api_key')
-    @classmethod
-    def validate_api_key(cls, v, info) -> str:
-        """
-        if provider is ollama, or base_url starts with "http://localhost", then api_key is not required; required otherwise
-        """
-        provider = info.data.get('provider','').lower()
-        base_url = info.data.get('base_url','')
-
-        # API key not required for local models
-        if provider == "ollama" or base_url.startswith('http://localhost'):
-            return v
-        
-        if not v:
-            raise ValueError(f"API key is required for provider '{provider}'")
-        
-        return v
-
-    @field_validator('base_url')
-    @classmethod
-    def validate_base_url(cls, v, info) -> str:
-        """Auto-fill base_url from recognized providers if not provided"""
-        if v: # if base_url is provided, just use it
-            return v
-        
-        provider = info.data.get('provider','').lower()
-        if provider in recognized_providers:
-            return recognized_providers[provider]
-        
-        raise ValueError(f"base_url required for unrecognized provider '{provider}'")
-
     @field_validator('query_template')
     @classmethod
     def validate_query_template(cls, v, info) -> int:
         if 'user_interests' not in info.data:
             return v
         if '{user_interests}' not in v:
-            raise ValueError("query_template must include '{user_interests}' placeholder if user_interests is given.")
+            raise ValueError("Error initializing RaterEmbedderConfig: query_template must include '{user_interests}' placeholder if user_interests is given.")
         return v
     
     @field_validator('context_length')
@@ -285,6 +246,7 @@ class RaterEmbedderConfig(BaseModel):
             provider=self.provider,
             api_key=self.api_key,
             base_url=self.base_url,
+            model=self.model,
             query_template=self.query_template,
             user_interests=self.user_interests,
             context_length=self.context_length
@@ -302,49 +264,6 @@ class RaterLLMConfig(BaseModel):
     context_length: Optional[int]=65536
     criteria: Dict[str,Dict[str,Union[str,float]]]={"novelty": {"description": "How original and innovative are the contributions?", "weight": 0.3}, "clarity": {"description": "How well-written and understandable is the paper?", "weight": 0.2}}
 
-    @field_validator('provider')
-    @classmethod
-    def validate_provider(cls, v, info) -> str:
-        """
-        if base_url is provided, provider is not required;
-        if base_url is not provided, then provider is required, and provider.lower() must be in recognized_providers
-        """
-        if 'base_url' in info.data: # if base_url is provided, provider can be anything
-            return v
-        if v.lower() not in recognized_providers:
-            raise ValueError(f"Provider '{v}' not recognized. Use one of: {list(recognized_providers.keys())} if you don't want to specify base_url.")
-
-    @field_validator('api_key')
-    @classmethod
-    def validate_api_key(cls, v, info) -> str:
-        """
-        if provider is ollama, or base_url starts with "http://localhost", then api_key is not required; required otherwise
-        """
-        provider = info.data.get('provider','').lower()
-        base_url = info.data.get('base_url','')
-
-        # API key not required for local models
-        if provider == "ollama" or base_url.startswith('http://localhost'):
-            return v
-        
-        if not v:
-            raise ValueError(f"API key is required for provider '{provider}'")
-        
-        return v
-
-    @field_validator('base_url')
-    @classmethod
-    def validate_base_url(cls, v, info) -> str:
-        """Auto-fill base_url from recognized providers if not provided"""
-        if v: # if base_url is provided, just use it
-            return v
-        
-        provider = info.data.get('provider','').lower()
-        if provider in recognized_providers:
-            return recognized_providers[provider]
-        
-        raise ValueError(f"base_url required for unrecognized provider '{provider}'")
-
     @field_validator('user_prompt_template')
     @classmethod
     def validate_user_prompt_template(cls, v) -> str:
@@ -354,7 +273,7 @@ class RaterLLMConfig(BaseModel):
         """
         for placeholder in ['{paper_text}','{criteria_text}']:
             if placeholder not in v:
-                raise ValueError(f"user_prompt_template must contain '{placeholder}'")
+                raise ValueError(f"Error initializing RaterLLMConfig: user_prompt_template must contain '{placeholder}'")
         
         return v
 
@@ -436,49 +355,6 @@ class ParserVLMConfig(BaseModel):
     user_prompt: str
     completion_options: Dict[str,Any]={"temperature": 0.2}
     dpi: int=168
-
-    @field_validator('provider')
-    @classmethod
-    def validate_provider(cls, v, info) -> str:
-        """
-        if base_url is provided, provider is not required;
-        if base_url is not provided, then provider is required, and provider.lower() must be in recognized_providers
-        """
-        if 'base_url' in info.data: # if base_url is provided, provider can be anything
-            return v
-        if v.lower() not in recognized_providers:
-            raise ValueError(f"Provider '{v}' not recognized. Use one of: {list(recognized_providers.keys())} if you don't want to specify base_url.")
-
-    @field_validator('api_key')
-    @classmethod
-    def validate_api_key(cls, v, info) -> str:
-        """
-        if provider is ollama, or base_url starts with "http://localhost", then api_key is not required; required otherwise
-        """
-        provider = info.data.get('provider','').lower()
-        base_url = info.data.get('base_url','')
-
-        # API key not required for local models
-        if provider == "ollama" or base_url.startswith('http://localhost'):
-            return v
-        
-        if not v:
-            raise ValueError(f"API key is required for provider '{provider}'")
-        
-        return v
-
-    @field_validator('base_url')
-    @classmethod
-    def validate_base_url(cls, v, info) -> str:
-        """Auto-fill base_url from recognized providers if not provided"""
-        if v: # if base_url is provided, just use it
-            return v
-        
-        provider = info.data.get('provider','').lower()
-        if provider in recognized_providers:
-            return recognized_providers[provider]
-        
-        raise ValueError(f"base_url required for unrecognized provider '{provider}'")    
     
     @field_validator('completion_options')
     @classmethod
@@ -557,20 +433,104 @@ class CacherConfig(BaseModel):
             ttl_days=self.ttl_days
         )
 
-class RendererConfig(BaseModel):
-    formats: List[str]=["pdf","md"]
-    output_dir: str
-    """Not implemented, skip this"""
+class MarkdownRendererConfig(BaseModel):
+    include_pagebreaks: bool=True
+
+    def to_pipeline_config(self):
+        return MarkdownRendererConfig_(
+            include_pagebreaks=self.include_pagebreaks
+        )
+
+class PDFRenderConfig(BaseModel):
+    pdf_engine: str="xelatex"
+    highlight_style: str="pygments"
+    font_size: str="14pt"
+    document_class: str="extarticle"
+    margin: str="0.8in"
+    colorlinks: bool=True
+    link_color: str="RoyalBlue"
+    line_stretch: float=1.15
+    pandoc_input_format: str="markdown+raw_tex+yaml_metadata_block"
+    pandoc_from_format: str="gfm"
+
+    def to_pipeline_config(self):
+        return PDFRendererConfig_(
+            pdf_engine=self.pdf_engine,
+            highlight_style=self.highlight_style,
+            font_size=self.font_size,
+            document_class=self.document_class,
+            margin=self.margin,
+            colorlinks=self.colorlinks,
+            link_color=self.link_color,
+            line_stretch=self.line_stretch,
+            pandoc_input_format=self.pandoc_input_format,
+            pandoc_from_format=self.pandoc_from_format
+        )
+
+class HTMLRendererConfig(BaseModel):
+    math_renderer: str="mathjax"
+    mathjax_url: Optional[str]=None
+    katex_url: Optional[str]=None
+    include_toc: bool=True
+    toc_depth: int=3
+    number_sections: bool=False
+    standalone: bool=True
+    self_contained: bool=False
+    css_file: Optional[str]=None
+    css_inline: Optional[str]=None
+    template_file: Optional[str]=None
+    highlight_style: str="pygments"
+    html5: bool=True
+
+    def to_pipeline_config(self):
+        return HTMLRendererConfig_(
+            math_renderer=self.math_renderer,
+            mathjax_url=self.mathjax_url,
+            katex_url=self.katex_url,
+            include_toc=self.include_toc,
+            toc_depth=self.toc_depth,
+            number_sections=self.number_sections,
+            standalone=self.standalone,
+            self_contained=self.self_contained,
+            css_file=self.css_file,
+            css_inline=self.css_inline,
+            template_file=self.template_file,
+            highlight_style=self.highlight_style,
+            html5=self.html5
+        )
+
+class AZW3RendererConfig(BaseModel):
+    pass
 
     def to_pipeline_config(self):
         pass
 
+class RendererConfig(BaseModel):
+    formats: List[str]=["pdf","md"]
+    output_dir: str
+    base_filename: Optional[str]=None
+    md: MarkdownRendererConfig=MarkdownRendererConfig()
+    pdf: PDFRenderConfig=PDFRenderConfig()
+    html: HTMLRendererConfig=HTMLRendererConfig()
+    azw3: AZW3RendererConfig=AZW3RendererConfig()
+
+    def to_pipeline_config(self):
+        return RendererConfig_(
+            formats=self.formats,
+            output_dir=self.output_dir,
+            base_filename=self.base_filename,
+            md=self.md.to_pipeline_config() if self.md else MarkdownRendererConfig().to_pipeline_config(),
+            pdf=self.pdf.to_pipeline_config() if self.pdf else PDFRenderConfig().to_pipeline_config(),
+            html=self.html.to_pipeline_config() if self.html else HTMLRendererConfig().to_pipeline_config(),
+            azw3=self.azw3.to_pipeline_config() if self.azw3 else AZW3RendererConfig().to_pipeline_config()
+        )
+
 class DelivererConfig(BaseModel):
     smtp_server: str
-    port: int=465
     sender: str
     recipient: str
     password: str
+    port: int=465
     max_attachment_size_mb: float=25.0
 
     @field_validator('port')
@@ -669,14 +629,15 @@ class MainConfig(BaseModel):
     def get_pipeline_configs(self) -> Dict[str, Any]:
         """Convert all configs to pipeline dataclasses"""
         return {
+            "categories": self.run.categories,
             "fetch": self.fetch.to_pipeline_config(),
-            "summarize": self.summarize.to_pipeline_config(),
-            "rate": self.rate.to_pipeline_config(),
             "parse": self.parse.to_pipeline_config(),
-            "batch": self.batch.to_pipeline_config(),
+            "rate": self.rate.to_pipeline_config(),
             "cache": self.cache.to_pipeline_config(),
+            "summarize": self.summarize.to_pipeline_config(),
             "render": self.render.to_pipeline_config(),
-            "deliver": self.deliver.to_pipeline_config()
+            "deliver": self.deliver.to_pipeline_config(),
+            "batch": self.batch.to_pipeline_config()
         }
 
 

@@ -23,10 +23,10 @@ class DeliveryResult:
 @dataclass
 class DelivererConfig:
     smtp_server: str
-    port: int=465
     sender: str
     recipient: str
     password: str
+    port: int=465
     max_attachment_size_mb: float=25.0
 
 def _check_file_status(file_path: str, max_size_bytes: int) -> Tuple[str,Dict[str,Any]]:

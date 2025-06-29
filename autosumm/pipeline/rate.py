@@ -17,9 +17,9 @@ except:
 
 @dataclass
 class RaterEmbedderConfig:
-    provider: Optional[str]=None
-    api_key: Optional[str]=None
-    base_url: Optional[str]=None
+    provider: Optional[str]
+    api_key: Optional[str]
+    base_url: Optional[str]
     model: str
     query_template: str="High-quality {user_interests} research paper with novel contributions, rigorous methodology, clear presentation and significant impact."
     user_interests: Optional[str]=None
@@ -31,8 +31,8 @@ class RaterLLMConfig:
     api_key: Optional[str]
     base_url: Optional[str]
     model: str
-    batch: bool=False
-    system_prompt: Optional[str]=None
+    batch: bool
+    system_prompt: Optional[str]
     user_prompt_template: str
     completion_options: Dict[str,Any]
     context_length: Optional[int]
@@ -64,103 +64,116 @@ def cosine_similarity(a: List[float], b: List[float]) -> float:
     
     return dot_product / (a_norm * b_norm)
 
-class EmbedderClient:
-    """OpenAI-compatible embedding client with context length management."""
-    def __init__(self, config: RaterEmbedderConfig):
-        self.config = config
-        self.context_length = config.context_length or 32768
-        self.query_embedding = self.create_query_embedding()
-
-    def _chunk_text(self, text: str) -> List[Tuple[str,int]]:
-        """Split text into chunks that fit within embedder's token limit"""
-        sentences = text.split('. ')
-        chunks = []
-        current_chunk = ""
-        current_tokens = 0
-
-        for sentence in sentences:
-            sentence_tokens = count_tokens(sentence)
-
-            if sentence_tokens > self.context_length: # single sentence exceeds limit? truncate it
-                truncated = truncate_to_tokens(sentence, self.context_length)
-                if current_chunk:
-                    chunks.append((current_chunk.strip(), current_tokens))
-                chunks.append((truncated, self.context_length))
-                current_chunk = ""
-                current_tokens = 0
-                continue
-
-            if current_tokens + sentence_tokens > self.context_length: # if add this sentence would exceed limit, start a new chunk
-                if current_chunk:
-                    chunks.append((current_chunk.strip(),current_tokens))
-                current_chunk = sentence
-                current_tokens = sentence_tokens
-            else:
-                current_chunk += (". " if current_chunk else "") + sentence
-                current_tokens += sentence_tokens
-
-        if current_chunk:
-            chunks.append((current_chunk.strip(), current_tokens))
-
-        return chunks
+def chunk_text(text: str, max_tokens: int) -> List[Tuple[str, int]]:
+    """Split text into chunks that fit within token limit."""
+    sentences = text.split('. ')
+    chunks = []
+    current_chunk = ""
+    current_tokens = 0
     
-    def _make_request(self, texts: List[str]) -> List[List[float]]:
-        """Make embedding request to API."""
-        headers = {"Content-Type": "application/json"}
-        if self.config.api_key:
-            headers["Authorization"] = f"Bearer {self.config.api_key}"
+    for sentence in sentences:
+        sentence_tokens = count_tokens(sentence)
+        
+        # If single sentence exceeds limit, truncate it
+        if sentence_tokens > max_tokens:
+            truncated = truncate_to_tokens(sentence, max_tokens)
+            if current_chunk:
+                chunks.append((current_chunk.strip(), current_tokens))
+            chunks.append((truncated, max_tokens))
+            current_chunk = ""
+            current_tokens = 0
+            continue
+        
+        # If adding this sentence would exceed limit, start new chunk
+        if current_tokens + sentence_tokens > max_tokens:
+            if current_chunk:
+                chunks.append((current_chunk.strip(), current_tokens))
+            current_chunk = sentence
+            current_tokens = sentence_tokens
+        else:
+            current_chunk += (". " if current_chunk else "") + sentence
+            current_tokens += sentence_tokens
+    
+    # Add final chunk
+    if current_chunk:
+        chunks.append((current_chunk.strip(), current_tokens))
+    
+    return chunks
+
+class RaterEmbedderClient(BaseClient):
+    def __init__(self, config: RaterEmbedderConfig, batch_config: Optional[BatchConfig]=None):
+        super().__init__(config, batch_config)
+        self.context_length = config.context_length or 32768
+        self.query_embedding = self._compute_query_embedding()
+
+    def _compute_query_embedding(self) -> List[float]:
+        query = self.config.query_template.format(user_interests=self.config.user_interests)
+
+        headers = self._get_headers()
+        endpoint = self._get_endpoint_url()
 
         if "ollama" in self.config.provider.lower():
-            endpoint = f"{self.config.base_url.rstrip('/')}/api/embeddings"
             payload = {
                 "model": self.config.model,
-                "prompt": texts[0] if len(texts) == 1 else texts
+                "prompt": query
             }
         else:
-            endpoint = f"{self.config.base_url.rstrip('/')}/embeddings"
             payload = {
                 "model": self.config.model,
-                "input": texts
+                "input": query
             }
-
-        response = requests.post(endpoint, headers=headers, json=payload)
+        
+        response = requests.post(endpoint, headers=headers,json=payload)
         response.raise_for_status()
-
         result = response.json()
 
         if "ollama" in self.config.provider.lower():
-            if isinstance(result.get("embedding"),list):
-                return [result["embedding"]]
-            else:
-                return result.get("embeddings",[])
+            return result.get("embedding",[])
         else:
-            return [item["embedding"] for item in result["data"]]
-        
-    def get_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """Get embeddings for texts, handling chunking when needed"""
-        embeddings = []
-        
-        for text in texts:
-            embedding = self._make_request([text])[0]
-            embeddings.append(embedding)
+            return result["data"][0]["embedding"]
 
-        return embeddings
+    def _build_payload(self, text_chunk: str):
+        if "ollama" in self.config.provider.lower() or self.config.base_url.startswith("http://localhost"):
+            payload = {
+                "model": self.config.model,
+                "prompt": text_chunk
+            }
+        else:
+            payload = {
+                "model": self.config.model,
+                "input": [text_chunk]
+            }
+        return payload
     
-    def create_query_embedding(self) -> List[float]:
-        query = self.config.query_template.format(user_interests=self.config.user_interests)
-        return self.get_embeddings([query])[0]
+    def _get_endpoint_url(self):
+        if "ollama" in self.config.provider.lower() or self.config.base_url.startswith("http://localhost"):
+            endpoint = f"{self.config.base_url.rstrip('/')}/api/embeddings"
+        else:
+            endpoint = f"{self.config.base_url.rstrip('/')}/embeddings"
+        return endpoint
     
-    def get_cosine_similarity(self, text: str) -> float:
-        """
-        Get cosine similarity while handling text processing for different context length.
-        """
-        chunks = self._chunk_text(text)
-        texts = [chunk[0] for chunk in chunks]
-        lengths = [chunk[1] for chunk in chunks]
-        embeddings = self.get_embeddings(texts)
-        similarity = sum([len*cosine_similarity(emb, self.query_embedding) for len,emb in zip(lengths,embeddings)])
-        return similarity/sum(lengths)
-    
+    def _parse_response(self, response):
+        result = json.loads(response)
+
+        if "ollama" in self.config.provider.lower():
+            doc_embedding = result.get("embedding",[])
+        else:
+            doc_embedding = result["data"][0]["embedding"]
+
+        return cosine_similarity(self.query_embedding, doc_embedding)
+
+    def _make_sync_request(self, payload):
+        """Override to handle embedding response"""
+        payload.pop('stream',None)
+
+        headers = self._get_headers()
+        endpoint = self._get_endpoint_url()
+
+        response = requests.post(endpoint, headers=headers,json=payload)
+        response.raise_for_status()
+
+        return json.dumps(response.json())
+              
 class RaterLLMClient(BaseClient):
     def __init__(self, config: RaterLLMConfig, batch_config: Optional[BatchConfig]=None):
         super().__init__(config, batch_config)
@@ -249,23 +262,44 @@ class RaterLLMClient(BaseClient):
         messages.append({"role": "user", "content": user_content})
         return messages
 
-        
 def rate_embed(parsed_contents: List[str], config: RaterConfig) -> List[RateResult]:
-    """Rate paper using embedding similarity"""
-    
-    embedder_client = EmbedderClient(config.embedder)
+    """Rate papers using embedding similarity with text chunking."""
+    embedder_client = RaterEmbedderClient(config.embedder)
     results = []
-
+    
     for content in parsed_contents:
         try:
-            similarity_score = embedder_client.get_cosine_similarity(content)
-
+            # Handle text chunking here
+            token_count = count_tokens(content)
+            
+            if token_count <= embedder_client.context_length:
+                # Text fits, get similarity directly
+                similarity_score = embedder_client.process_single(content)
+            else:
+                # Text too long, chunk and get weighted average
+                chunks = chunk_text(content, embedder_client.context_length)
+                chunk_texts = [chunk[0] for chunk in chunks]
+                chunk_weights = [chunk[1] for chunk in chunks]
+                
+                # Get similarities for all chunks (could use batch processing here)
+                chunk_similarities = [embedder_client.process_single(chunk_text) for chunk_text in chunk_texts]
+                
+                # Calculate weighted average
+                total_weight = sum(chunk_weights)
+                if total_weight > 0:
+                    weighted_similarity = sum(sim * weight for sim, weight in zip(chunk_similarities, chunk_weights)) / total_weight
+                else:
+                    weighted_similarity = 0.0
+                
+                similarity_score = weighted_similarity
+            
             results.append(RateResult(
-                score=similarity_score,
-                success=True,
-                error="",
+                score=similarity_score or 0.0,
+                success=similarity_score is not None,
+                error=None if similarity_score is not None else "Embedding failed",
                 method="embed"
             ))
+            
         except Exception as e:
             results.append(RateResult(
                 score=0.0,
@@ -273,7 +307,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig) -> List[RateResu
                 error=str(e),
                 method="embed"
             ))
-
+    
     return results
 
 def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Optional[BatchConfig]=None) -> List[RateResult]:

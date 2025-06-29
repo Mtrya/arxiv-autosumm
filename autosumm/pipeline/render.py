@@ -7,8 +7,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import subprocess
 import re
-import os
 from datetime import datetime
+
+try:
+    from client import BaseClient, BatchConfig
+except:
+    from .client import BaseClient, BatchConfig
 
 @dataclass
 class MarkdownRendererConfig:
@@ -26,7 +30,6 @@ class PDFRendererConfig:
     line_stretch: float=1.15
     pandoc_input_format: str="markdown+raw_tex+yaml_metadata_block"
     pandoc_from_format: str="gfm"
-    additional_pandoc_args: List[str]=field(default_factory=list)
 
 @dataclass
 class HTMLRendererConfig:
@@ -43,16 +46,19 @@ class HTMLRendererConfig:
     template_file: Optional[str]=None
     highlight_style: str="pygments"
     html5: bool=True
-    additional_pandoc_args: List[str]=field(default_factory=list)
+
+class AZW3RendererConfig:
+    pass
 
 @dataclass
 class RendererConfig:
     formats: List[str]=field(default_factory=lambda: ["pdf","md"]) # allowed formats: pdf, html, md, epub, mp3, wav, ogg
     output_dir: str="./output"
     base_filename: Optional[str]=None # If None, auto-generate timestamp-based name
-    markdown: MarkdownRendererConfig=field(default_factory=MarkdownRendererConfig)
+    md: MarkdownRendererConfig=field(default_factory=MarkdownRendererConfig)
     pdf: PDFRendererConfig=field(default_factory=PDFRendererConfig)
     html: HTMLRendererConfig=field(default_factory=HTMLRendererConfig)
+    azw3: AZW3RendererConfig=field(default_factory=AZW3RendererConfig)
 
 @dataclass
 class RenderResult:
@@ -86,7 +92,7 @@ def render_md(summaries: List[str], category: str, config: RendererConfig) -> Re
     base_filename = _generate_base_filename(category, config)
     md_file = output_path / f"{base_filename}.md"
 
-    if config.markdown.include_pagebreaks:
+    if config.md.include_pagebreaks:
         separator = "\n\n\\pagebreak\n\n"
         content = separator.join(summaries)
     else:
@@ -149,8 +155,6 @@ def render_pdf(summaries: List[str], category, config: RendererConfig) -> Render
             "--variable", "colorlinks=true",
             "--variable", f"linkcolor={config.pdf.link_color}"
         ])
-
-    cmd.extend(config.pdf.additional_pandoc_args)
 
     subprocess.run(cmd, check=True, capture_output=True,text=True)
 
@@ -238,8 +242,6 @@ def render_html(summaries: List[str], category, config: RendererConfig) -> Rende
 
     if config.html.template_file:
         cmd.extend(["--template", config.html.template_file])
-    
-    cmd.extend(config.html.additional_pandoc_args)
 
     result = subprocess.run(cmd, check=True, capture_output=True, text=True)
 
@@ -256,16 +258,7 @@ def render_html(summaries: List[str], category, config: RendererConfig) -> Rende
         success=True
     )
 
-def render_epub(summaries: List[str], category, config: RendererConfig) -> RenderResult:
-    pass
-
-def render_mp3(summaries: List[str], category, config: RendererConfig) -> RenderResult:
-    pass
-
-def render_wav(summaries: List[str], category, config: RendererConfig) -> RenderResult:
-    pass
-
-def render_ogg(summaries: List[str], category, config: RendererConfig) -> RenderResult:
+def render_azw3(summaries: List[str], category, config: RendererConfig) -> RenderResult:
     pass
 
 def render(summaries: List[str], category: str, config: RendererConfig) -> List[RenderResult]:
@@ -293,14 +286,8 @@ def render(summaries: List[str], category: str, config: RendererConfig) -> List[
             result = render_pdf(summaries, category, config)
         elif format_name == "html":
             result = render_html(summaries, category, config)
-        elif format_name == "epub":
-            result = render_epub(summaries, category, config)
-        elif format_name == "mp3":
-            result = render_mp3(summaries, category, config)
-        elif format_name == "wav":
-            result = render_wav(summaries, category, config)
-        elif format_name == "ogg":
-            result = render_ogg(summaries, category, config)
+        elif format_name == "azw3":
+            result = render_azw3(summaries, category, config)
         else:
             result = RenderResult(
                 path="",
@@ -314,8 +301,8 @@ def render(summaries: List[str], category: str, config: RendererConfig) -> List[
 
 if __name__ == "__main__":
     test_summaries = [
-        "## Title: First Paper\n##### Authors: Alice, Bob\n##### Link: arxiv:2301.00001\n\nThis is the first summary.",
-        "## Title: Second Paper\n##### Authors: Charlie, Dave\n##### Link: arxiv:2301.00002\n\nThis is the second summary."
+        "## Title: First Paper\n##### Authors: Alice, Bob\n##### Link: arxiv:2301.00001\n\nThis is the first summary.\n$x=x+2$\n$$ x^2=4 $$",
+        "## Title: Second Paper\n##### Authors: Charlie, Dave\n##### Link: arxiv:2301.00002\n\nThis is the second summary.\n$x=x+2$\n$$ x^2=4 $$"
     ]
     
     config = RendererConfig(
