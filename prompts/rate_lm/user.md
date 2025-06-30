@@ -11,4 +11,4 @@ Rate each criterion on a scale of 1-10 where:
 Paper content:
 {paper_text}
 
-Provide your response as a single JSON object. The keys of the object should be the criteria names. For each criterion, provide a nested JSON object with "justification" (a brief explanation for the score) and "score" (a numerical rating from 1-10).
+Provide your response as a single JSON object. The keys of the object should be the criteria names. For each criterion, provide a nested JSON object with "score" (a numerical rating from 1-10) and "justification" (a brief explanation for the score).

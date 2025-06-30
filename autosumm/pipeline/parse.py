@@ -156,15 +156,14 @@ class ParserVLMClient(BaseClient):
             "role": "user",
             "content": [
                 {"type": "text","text": self.config.user_prompt},
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}}
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}","detail": "high"}}
             ]
         })
 
         base_payload = {
             "model": self.config.model,
             "messages": messages,
-            "max_tokens": 8192,
-            "stream": True
+            "stream": False
         }
 
         if "ollama" in self.config.provider.lower():
@@ -286,16 +285,32 @@ def parse_fast(pdf_urls: List[str], config: ParserConfig) -> List[ParseResult]:
     
 
 if __name__ == "__main__":
-    config = ParserVLMConfig(
-        provider="aliyun",
-        api_key=os.getenv("DASHSCOPE_API_KEY"),
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-        model="qwen-vl-plus",
-        batch=True,
+    vlm_config = ParserVLMConfig(
+        provider="siliconflow",
+        api_key=os.getenv("SILICONFLOW_API_KEY"),
+        base_url="https://api.siliconflow.cn/v1",
+        model="Pro/Qwen/Qwen2.5-VL-7B-Instruct",
+        batch=False,
+        system_prompt="""You are an AI specialized in recognizing and extracting text. 
+Your mission and your only mission is to analyze the image document and return it in **markdown** format, use markdown syntax to preserve the title level of the original document.""",
+        user_prompt="""Extract the text from the above document image as if you were reading it naturally. Return the equations in LaTeX representation. If there is an image in the document and image caption is not present, add a brief description of the image. If there is a table in the document and table caption is not present, add a brief description of the table without reproducing it with html. Do not include page numbers for better readability.""",
+        completion_options={"temperature":0.2}
+    )
+    batch_config = BatchConfig(
+        tmp_dir="./tmp",
+        max_wait_hours=24,
+        poll_intervall_seconds=30,
+        fallback_on_error=True
+    )
+    config = ParserConfig(
+        enable_vlm=True,
+        tmp_dir="./tmp",
+        vlm=vlm_config
     )
 
+
     pdf_url = "http://arxiv.org/pdf/1706.03762"
-    result = parse_vlm([pdf_url], config)[0]
+    result = parse_vlm([pdf_url], config, batch_config)[0]
 
     print(f"VLM parsing success: {result.success}")
     print(f"Content:\n{result.content}")

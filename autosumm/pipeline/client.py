@@ -51,7 +51,14 @@ class BaseClient(ABC):
         endpoint = self._get_endpoint_url()
 
         response = requests.post(endpoint, headers=headers, json=payload)
-        response.raise_for_status()
+
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP Error: {e}")
+            print(f"Response status code: {response.status_code}")
+            print(f"Response text: {response.text}")
+            raise
 
         if "ollama" in self.config.provider.lower():
             return self._handle_ollama_response(response, payload.get("stream", False))

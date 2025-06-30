@@ -221,24 +221,28 @@ class RaterLLMClient(BaseClient):
             return f"{self.config.base_url.rstrip('/')}/chat/completions"
         
     def _parse_response(self, response_content) -> float:
-        response = repair_json(response_content)
-        response = response.replace('```jons','').replace('```','').strip()
-        ratings_data = json.loads(response)
-        
-        weighted_sum = 0.0
-        total_weight = 0.0
+        try:
+            response = repair_json(response_content)
+            response = response.replace('```jons','').replace('```','').strip()
+            ratings_data = json.loads(response)
+            
+            weighted_sum = 0.0
+            total_weight = 0.0
 
-        for criterion, details in self.config.criteria.items():
-            if criterion in ratings_data and 'score' in ratings_data[criterion]:
-                score = float(ratings_data[criterion]['score'])
-                weight = details['weight']
-                weighted_sum += weight*score
-                total_weight += weight
+            for criterion, details in self.config.criteria.items():
+                if criterion in ratings_data and 'score' in ratings_data[criterion]:
+                    score = float(ratings_data[criterion]['score'])
+                    weight = details['weight']
+                    weighted_sum += weight*score
+                    total_weight += weight
 
-        if total_weight > 0:
-            final_score = weighted_sum / total_weight
-        else:
-            final_score = 0.0
+            if total_weight > 0:
+                final_score = weighted_sum / total_weight
+            else:
+                final_score = 0.0
+        except Exception as e:
+            print(f"error parsing response {response}: {e}")
+            return 0.0
         
         return final_score
 
