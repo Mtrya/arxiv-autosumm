@@ -7,3 +7,5 @@ config.yaml
 test_output
 main_.py
 *.txt
+my_own_config.yaml
+output

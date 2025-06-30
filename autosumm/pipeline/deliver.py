@@ -16,9 +16,11 @@ from typing import List, Tuple, Optional, Dict, Any
 @dataclass
 class DeliveryResult:
     success: bool
-    delivered_files: List[str]
-    skipped_files: List[Tuple[str,str]] # (file_path, reason)
-    error_message: Optional[str]=None
+    files_sent: List[str]
+    files_skipped: List[Tuple[str,str]] # (file_path, reason)
+    files_too_large: List[str]
+    error_files: List[str]
+    email_size_mb: float
 
 @dataclass
 class DelivererConfig:
@@ -28,6 +30,7 @@ class DelivererConfig:
     password: str
     port: int=465
     max_attachment_size_mb: float=25.0
+
 
 def _check_file_status(file_path: str, max_size_bytes: int) -> Tuple[str,Dict[str,Any]]:
     path = Path(file_path)
@@ -113,25 +116,25 @@ def deliver(file_paths: List[str], config: DelivererConfig, subject: Optional[st
     max_size_bytes = int(config.max_attachment_size_mb*1024*1024)
 
     attachments_data = []
-    total_attachment_size = []
+    total_attachment_size = 0.0
 
     for file_path in file_paths:
         status, info = _check_file_status(file_path, max_size_bytes)
 
         if status == "good":
             files_sent.append(file_path)
-            attachments_data.append((file_path, info['size_bytes']))
-            total_attachment_size += info['size_bytes']
+            attachments_data.append((file_path, info["size_bytes"]))
+            total_attachment_size += info["size_bytes"]
         elif status == "error":
             error_files.append(file_path)
-            attachments_data.append((file_path, info['size_bytes']))
-            total_attachment_size += info['size_bytes']
+            attachments_data.append((file_path, info["size_bytes"]))
+            total_attachment_size += info["size_bytes"]
         elif status == "too_large":
             files_too_large.append(file_path)
         elif status == "log_file":
             log_files.append(file_path)
-            attachments_data.append((file_path, info['size_bytes']))
-            total_attachment_size += info['size_bytes']
+            attachments_data.append((file_path, info["size_bytes"]))
+            total_attachment_size += info["size_bytes"]
         else:
             files_skipped.append(file_path)
 

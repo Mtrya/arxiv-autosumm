@@ -145,6 +145,7 @@ class SummarizerConfig(BaseModel):
             return v
         if v.lower() not in recognized_providers:
             raise ValueError(f"Provider '{v}' not recognized. Use one of: {list(recognized_providers.keys())} if you don't want to specify base_url.")
+        return v
 
     @field_validator('api_key')
     @classmethod
@@ -311,6 +312,7 @@ class RaterLLMConfig(BaseModel):
 
 class RaterConfig(BaseModel):
     top_k: int=200
+    max_selected: int=8
     embedder: Optional[RaterEmbedderConfig]=None
     llm: Optional[RaterLLMConfig]=None
     """
@@ -341,6 +343,7 @@ class RaterConfig(BaseModel):
     def to_pipeline_config(self):
         return RaterConfig_(
             top_k=self.top_k,
+            max_selected=self.max_selected,
             embedder=self.embedder.to_pipeline_config() if self.embedder else None,
             llm=self.llm.to_pipeline_config() if self.llm else None
         )

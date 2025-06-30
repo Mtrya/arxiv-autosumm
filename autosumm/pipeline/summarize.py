@@ -3,6 +3,7 @@ Summarize parsed papers using LLM
 """
 
 from dataclasses import dataclass
+import time
 from typing import Optional, Dict, Any, List
 
 try:
@@ -90,6 +91,10 @@ class SummarizerClient(BaseClient):
             
         messages.append({"role": "user", "content": user_content})
         return messages
+    
+    def process_single(self, input_data):
+        time.sleep(10)
+        return super().process_single(input_data)
 
 def summarize(parsed_contents: List[str], config: SummarizerConfig, batch_config: Optional[BatchConfig] = None) -> List[SummaryResult]:
     """Summarize multiple papers using batch processing when possible."""

@@ -190,7 +190,7 @@ class ParserVLMClient(BaseClient):
         """Override because 'http://localhost:11434/v1/chat/completions' return openai-compatible response"""
         return super()._handle_openai_response(response, is_streaming)
         
-def parse_vlm(pdf_urls: List[str], config: ParserVLMConfig, batch_config: Optional[BatchConfig]=None) -> List[ParseResult]:
+def parse_vlm(pdf_urls: List[str], config: ParserConfig, batch_config: Optional[BatchConfig]=None) -> List[ParseResult]:
     """
     Main interface function for VLM parsing of multiple PDFs.
     
@@ -206,7 +206,7 @@ def parse_vlm(pdf_urls: List[str], config: ParserVLMConfig, batch_config: Option
     pdf_image_counts = []
     
     for pdf_index, pdf_url in enumerate(pdf_urls):
-        image_data_list = _pdf_to_images(pdf_url,pdf_index,config,batch_config.tmp_dir)
+        image_data_list = _pdf_to_images(pdf_url,pdf_index,config.vlm,batch_config.tmp_dir)
         all_image_data.extend(image_data_list)
         pdf_image_counts.append(len(image_data_list))
     
@@ -220,9 +220,9 @@ def parse_vlm(pdf_urls: List[str], config: ParserVLMConfig, batch_config: Option
             ) for _ in pdf_urls
         ]
 
-    vlm_client = ParserVLMClient(config, batch_config)
+    vlm_client = ParserVLMClient(config.vlm, batch_config)
 
-    if config.batch:
+    if config.vlm.batch:
         vlm_results = vlm_client.process_batch(all_image_data)
     else:
         vlm_results = [vlm_client.process_single(image_data) for image_data in all_image_data]

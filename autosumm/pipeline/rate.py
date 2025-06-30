@@ -8,6 +8,7 @@ import json
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Union, Tuple, Any
 from pathlib import Path
+import time
 from json_repair import repair_json
 
 try:
@@ -41,6 +42,7 @@ class RaterLLMConfig:
 @dataclass
 class RaterConfig:
     top_k: int
+    max_selected: int
     embedder: RaterEmbedderConfig
     llm: Optional[RaterLLMConfig]
 
@@ -222,17 +224,13 @@ class RaterLLMClient(BaseClient):
         response = repair_json(response_content)
         response = response.replace('```jons','').replace('```','').strip()
         ratings_data = json.loads(response)
-
-        required_keys = {"ratings", "justifications"}
-        if not all(key in ratings_data for key in required_keys):
-            return 0.0
         
         weighted_sum = 0.0
         total_weight = 0.0
 
         for criterion, details in self.config.criteria.items():
-            if criterion in ratings_data['ratings']:
-                score = float(ratings_data['ratings'][criterion])
+            if criterion in ratings_data and 'score' in ratings_data[criterion]:
+                score = float(ratings_data[criterion]['score'])
                 weight = details['weight']
                 weighted_sum += weight*score
                 total_weight += weight
@@ -262,9 +260,13 @@ class RaterLLMClient(BaseClient):
         messages.append({"role": "user", "content": user_content})
         return messages
 
-def rate_embed(parsed_contents: List[str], config: RaterConfig) -> List[RateResult]:
+    def process_single(self, input_data):
+        time.sleep(5)
+        return super().process_single(input_data)
+
+def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Optional[BatchConfig]=None) -> List[RateResult]:
     """Rate papers using embedding similarity with text chunking."""
-    embedder_client = RaterEmbedderClient(config.embedder)
+    embedder_client = RaterEmbedderClient(config.embedder, batch_config)
     results = []
     
     for content in parsed_contents:
@@ -349,29 +351,14 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
 
 if __name__ == "__main__":
     import os
-    embedder_config = RaterEmbedderConfig(
-        provider="ollama",
-        api_key=os.getenv("SILICONFLOW_API_KEY"),
-        base_url="http://localhost:11434",
-        model="dengcao/Qwen3-Embedding-8B:Q5_K_M",
-        query_template="Hight-quality {user_interests} research paper with novel contributions, rigorous methodology, clear presentation, and significant impact",
-        user_interests="AI, machine learning or astronomy",
-    )
-
     llm_config = RaterLLMConfig(
-        provider="ollama",
-        api_key=os.getenv("SILICONFLOW_API_KEY"),
-        base_url="http://localhost:11434",
-        model="qwen2.5:3b",
-        batch=False,
-        system_prompt="""You are an expert research paper reviewer with deep knowledge in computer science, AI, and machine learning. Your task is to evaluate research papers based on multiple criteria and provide structured ratings.
-
-You must respond with a valid JSON object containing:
-1. "ratings": A dictionary with numerical scores (1-10) for each criterion
-2. "justifications": A dictionary with brief explanations for each rating
-
-Be objective, concise, and focus on the paper's technical merit. Consider the paper's contributions within its specific domain.""",
-        user_prompt_template="""Please evaluate this research paper based on the following criteria:
+            provider="siliconflow",
+            api_key=os.getenv("SILICONFLOW_API_KEY"),
+            base_url="https://api.siliconflow.cn/v1",
+            model="THUDM/GLM-4-9B-0414",
+            batch=False,
+            system_prompt="You are an expert research paper evaluator.",
+            user_prompt_template="""Please evaluate this research paper based on the following criteria:
 
 {criteria_text}
 
@@ -384,57 +371,34 @@ Rate each criterion on a scale of 1-10 where:
 Paper content:
 {paper_text}
 
-Provide your response as a JSON object with "ratings" and "justifications" fields where "ratings" field include rating from each criterion and "justification" field include corresponding justification.""",
-    completion_options={
-        "temperature": 0.2,
-        "max_tokens": 1024
-    },
-    context_length=32768,
-    criteria={
-        "novelty": {
-            "description": "How original and innovative are the contributions?",
-            "weight": 0.3
-        },
-        "methodology": {
-            "description": "How rigorous is the experimental design and evaluation?",
-            "weight": 0.25
-        },
-        "clarity": {
-            "description": "How well-written and understandable is the paper?",
-            "weight": 0.2
-        },
-        "impact": {
-            "description": "How significant are the potential applications and impact?",
-            "weight": 0.15
-        },
-        "relevance": {
-            "description": "How well does this paper match the user's research interests of AI, machine learning and astronomy?",
-            "weight": 0.1
-        }
-    }
+Provide your response as a single JSON object. The keys of the object should be the criteria names. For each criterion, provide a nested JSON object with "score" (a numerical rating from 1-10) and "justification" (a brief explanation for the score).
+For example:
+{
+  "novelty": {
+    "score": 8,
+    "justification": "The use of self-attention mechanism was novel for translation tasks."
+  },
+  "clarity": {
+    "score": 9,
+    "justification": "The paper is exceptionally well-written and easy to follow."
+  }
+}""",
+            completion_options={},
+            context_length=32768,
+            criteria={
+                "novelty": 
+                {"description": "How original and innovative are the contributions?", "weight": 0.6},
+                "clarity": 
+                {"description": "How well-written and understandable is the paper?", "weight": 0.4}
+            }
+        )
+    batch_config = BatchConfig(
+        tmp_dir="./tmp",
+        max_wait_hours=24,
+        poll_intervall_seconds=24,
+        fallback_on_error=True
     )
+    client = RaterLLMClient(llm_config, batch_config)
 
-    rate_config = RaterConfig(
-        top_k=200,
-        embedder=embedder_config,
-        llm=llm_config
-    )
-
-    from parse import parse_fast, ParseConfig
-    config = ParseConfig()
-
-    pdf_url = "http://arxiv.org/pdf/1706.03762"
-    parsed_content = parse_fast(pdf_url, config).content
-    
-    embed_result = rate_embed([parsed_content], rate_config)[0]
-    print(f"Embedding similarity score: {embed_result.score:.3f}")
-    print(f"Success: {embed_result.success}")
-    if not embed_result.success:
-        print(f"Error: {embed_result.error}")
-
-    # Rate using LLM
-    llm_result = rate_llm([parsed_content], rate_config)[0]
-    print(f"\nLLM weighted score: {llm_result.score:.3f}")
-    print(f"Success: {llm_result.success}")
-    print(f"Error: {llm_result.error}")
-
+    #score = client._parse_response(response_content)
+    #print(score)
