@@ -264,10 +264,6 @@ class RaterLLMClient(BaseClient):
         messages.append({"role": "user", "content": user_content})
         return messages
 
-    def process_single(self, input_data):
-        time.sleep(5)
-        return super().process_single(input_data)
-
 def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Optional[BatchConfig]=None) -> List[RateResult]:
     """Rate papers using embedding similarity with text chunking."""
     embedder_client = RaterEmbedderClient(config.embedder, batch_config)

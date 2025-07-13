@@ -190,7 +190,7 @@ def run_pipeline(config_path):
         papers = parse_papers(papers, config["parse"], vlm=True, batch_config=config["batch"])
 
     # 12&13. Summarize selected papers, track selected papers
-    papers = summarize_paper(papers, cacher, config["summarize"], config["batch"])
+    papers = summarize_paper(papers, cacher, config["summarize"], config["render"], config["batch"])
 
     # 14. Render
     summaries = [p.summary for p in papers]

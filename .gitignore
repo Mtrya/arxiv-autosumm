@@ -1,5 +1,4 @@
 legacy*.py
-project_roadmap.md
 downloads/
 tmp/
 __pycache__
@@ -9,3 +8,4 @@ main_.py
 *.txt
 my_own_config.yaml
 output
+CLAUDE.md

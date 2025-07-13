@@ -287,6 +287,7 @@ class BaseClient(ABC):
 
     def process_single(self, input_data: Any) -> Optional[str]:
         """Process single input synchronously"""
+        time.sleep(5)
         payload = self._build_payload(input_data)
         response_content = self._make_sync_request(payload)
         return self._parse_response(response_content)

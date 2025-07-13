@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  arxiv-autosumm:
+    build: 
+      context: .
+      dockerfile: docker/Dockerfile
+    image: arxiv-autosumm:latest
+    container_name: arxiv-autosumm
+    
+    # Volume mounts for persistent data
+    volumes:
+      - ./config:/data/config
+      - ./cache:/data/cache
+      - ./output:/data/output
+    
+    # Environment variables
+    environment:
+      - ARXIV_AUTOSUMM_CONFIG=/data/config/config.yaml
+      - ARXIV_AUTOSUMM_CACHE_DIR=/data/cache
+      - ARXIV_AUTOSUMM_OUTPUT_DIR=/data/output
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Scheduled execution with cron
+  arxiv-autosumm-scheduled:
+    build: 
+      context: .
+      dockerfile: docker/Dockerfile
+    image: arxiv-autosumm:latest
+    container_name: arxiv-autosumm-scheduled
+    
+    volumes:
+      - ./config:/data/config
+      - ./cache:/data/cache
+      - ./output:/data/output
+    
+    environment:
+      - ARXIV_AUTOSUMM_CONFIG=/data/config/config.yaml
+      - ARXIV_AUTOSUMM_CACHE_DIR=/data/cache
+      - ARXIV_AUTOSUMM_OUTPUT_DIR=/data/output
+    
+    # Run on a schedule (example: daily at 3 AM)
+    command: >
+      sh -c "
+        echo 'Setting up cron schedule...' &&
+        echo '0 3 * * * cd /app && python -m autosumm.cli run --config /data/config/config.yaml' | crontab - &&
+        cron -f
+      "
+    
+    restart: unless-stopped
+    profiles:
+      - scheduled
