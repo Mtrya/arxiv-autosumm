@@ -285,14 +285,16 @@ class BaseClient(ABC):
 
         return final_results
 
-    def process_single(self, input_data: Any) -> Optional[str]:
+    def process_single(self, input_data: Any, sleep_time: float=5) -> Optional[str]:
         """Process single input synchronously"""
-        time.sleep(5)
-        payload = self._build_payload(input_data)
-        response_content = self._make_sync_request(payload)
-        return self._parse_response(response_content)
-
-
+        time.sleep(sleep_time)
+        try:
+            payload = self._build_payload(input_data)
+            response_content = self._make_sync_request(payload)
+            return self._parse_response(response_content)
+        except Exception as e:
+            print(f"Failed to process: {e}")
+            return ""
 
 def count_tokens(text: str) -> int:
     encoding = tiktoken.get_encoding("cl100k_base")

@@ -68,6 +68,53 @@ valid_options = {
     "top_logprobs": (0,5)
 }
 
+def validate_api_config(provider: Optional[str], base_url: Optional[str], api_key: Optional[str]) -> tuple[str, str, Optional[str]]:
+    """
+    Reusable API configuration validation function.
+    
+    Returns:
+        tuple: (provider, base_url, api_key) - all properly validated
+    """
+    
+    # Normalize inputs
+    provider = provider.lower() if provider else None
+    base_url = base_url.strip() if base_url else None
+    api_key = api_key.strip() if api_key else None
+    
+    # Rule 1: Auto-fill base_url from recognized providers if not provided
+    if not base_url:
+        if provider and provider in recognized_providers:
+            base_url = recognized_providers[provider]
+        elif not provider:
+            # If neither provider nor base_url is given, this is an error
+            raise ValueError("Either provider or base_url must be provided")
+    
+    # Rule 2: If base_url is provided but provider is not, use a placeholder
+    if not provider and base_url:
+        # Try to infer provider from base_url
+        for known_provider, known_url in recognized_providers.items():
+            if base_url.rstrip('/') == known_url.rstrip('/'):
+                provider = known_provider
+                break
+        else:
+            provider = "custom"
+    
+    # Rule 3: Check if api_key is required
+    is_local = (provider == "ollama" or 
+                (base_url and base_url.startswith("http://localhost")) or
+                (base_url and "localhost" in base_url))
+    
+    if not is_local and not api_key:
+        raise ValueError(f"API key is required for provider '{provider}' with base_url '{base_url}'")
+    
+    # Ensure we have valid strings for provider and base_url
+    if not provider:
+        provider = "unknown"
+    if not base_url:
+        raise ValueError("Base URL cannot be empty after processing")
+    
+    return provider, base_url, api_key
+
 
 class RuntimeConfig(BaseModel):
     texlive_root: Optional[str]=None
@@ -134,50 +181,17 @@ class SummarizerConfig(BaseModel):
     completion_options: Dict[str,Any]={"temperature": 0.6}
     context_length: int=98304
 
-    @field_validator('provider')
-    @classmethod
-    def validate_provider(cls, v, info) -> str:
-        """
-        if base_url is provided, provider is not required;
-        if base_url is not provided, then provider is required, and provider.lower() must be in recognized_providers
-        """
-        if 'base_url' in info.data: # if base_url is provided, provider can be anything
-            return v
-        if v.lower() not in recognized_providers:
-            raise ValueError(f"Provider '{v}' not recognized. Use one of: {list(recognized_providers.keys())} if you don't want to specify base_url.")
-        return v
+    @model_validator(mode='after')
+    def validate_api_config(self) -> 'SummarizerConfig':
+        """Validate API configuration using reusable function"""
+        provider, base_url, api_key = validate_api_config(
+            self.provider, self.base_url, self.api_key
+        )
+        self.provider = provider
+        self.base_url = base_url
+        self.api_key = api_key
+        return self
 
-    @field_validator('api_key')
-    @classmethod
-    def validate_api_key(cls, v, info) -> str:
-        """
-        if provider is ollama, or base_url starts with "http://localhost", then api_key is not required; required otherwise
-        """
-        provider = info.data.get('provider','').lower() if info.data.get('provider') else ''
-        base_url = info.data.get('base_url','')
-
-        # API key not required for local models
-        if provider == "ollama" or base_url.startswith('http://localhost'):
-            return v
-        
-        if not v:
-            raise ValueError(f"API key is required for provider '{provider}'")
-        
-        return v
-
-    @field_validator('base_url')
-    @classmethod
-    def validate_base_url(cls, v, info) -> str:
-        """Auto-fill base_url from recognized providers if not provided"""
-        if v: # if base_url is provided, just use it
-            return v
-        
-        provider = info.data.get('provider','').lower()
-        if provider in recognized_providers:
-            return recognized_providers[provider]
-        
-        raise ValueError(f"base_url required for unrecognized provider '{provider}'")
-    
     @field_validator('user_prompt_template')
     @classmethod
     def validate_user_prompt_template(cls, v) -> str:
@@ -228,6 +242,17 @@ class RaterEmbedderConfig(BaseModel):
     user_interests: Optional[str]=None
     context_length: int=2048
 
+    @model_validator(mode='after')
+    def validate_api_config(self) -> 'RaterEmbedderConfig':
+        """Validate API configuration using reusable function"""
+        provider, base_url, api_key = validate_api_config(
+            self.provider, self.base_url, self.api_key
+        )
+        self.provider = provider
+        self.base_url = base_url
+        self.api_key = api_key
+        return self
+
     @field_validator('query_template')
     @classmethod
     def validate_query_template(cls, v, info) -> int:
@@ -264,6 +289,17 @@ class RaterLLMConfig(BaseModel):
     completion_options: Dict[str,Any]={"temperature": 0.2, "max_tokens": 1024}
     context_length: Optional[int]=65536
     criteria: Dict[str,Dict[str,Union[str,float]]]={"novelty": {"description": "How original and innovative are the contributions?", "weight": 0.3}, "clarity": {"description": "How well-written and understandable is the paper?", "weight": 0.2}}
+
+    @model_validator(mode='after')
+    def validate_api_config(self) -> 'RaterLLMConfig':
+        """Validate API configuration using reusable function"""
+        provider, base_url, api_key = validate_api_config(
+            self.provider, self.base_url, self.api_key
+        )
+        self.provider = provider
+        self.base_url = base_url
+        self.api_key = api_key
+        return self
 
     @field_validator('user_prompt_template')
     @classmethod
@@ -311,7 +347,7 @@ class RaterLLMConfig(BaseModel):
         )
 
 class RaterConfig(BaseModel):
-    top_k: int=200
+    top_k: int=0
     max_selected: int=8
     embedder: Optional[RaterEmbedderConfig]=None
     llm: Optional[RaterLLMConfig]=None
@@ -377,6 +413,17 @@ class ParserVLMConfig(BaseModel):
     @classmethod
     def validate_dpi(cls, v: int) -> int:
         return max(36, min(v, 400))
+    
+    @model_validator(mode='after')
+    def validate_api_config(self) -> 'ParserVLMConfig':
+        """Validate API configuration using reusable function"""
+        provider, base_url, api_key = validate_api_config(
+            self.provider, self.base_url, self.api_key
+        )
+        self.provider = provider
+        self.base_url = base_url
+        self.api_key = api_key
+        return self
     
     def to_pipeline_config(self):
         return ParserVLMConfig_(

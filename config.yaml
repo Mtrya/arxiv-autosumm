@@ -1,0 +1,99 @@
+runtime:
+  docker_mount_cache: ~/.cache/arxiv-autosumm
+  docker_mount_output: ~/arxiv_summaries
+run:
+  schedule: 0 9 * * *
+  autostart: true
+  categories:
+  - cs.AI
+  - cs.LG
+  - cs.CL
+  - cs.CV
+  - cs.RO
+  - math.ST
+  - stat.ML
+  - q-bio.QM
+  - physics.comp-ph
+  send_log: false
+fetch:
+  days: 8
+  max_results: 1000
+  max_retries: 10
+summarize:
+  provider: volcengine
+  api_key: env:DEEPSEEK_API_KEY # use 'env:' pattern to safely store your API keys
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-reasoner
+  batch: false
+  system_prompt: file:prompts/summ_lm/system.md # can use 'file:' pattern
+  user_prompt_template: 'Summarize this research paper: {paper_content}' # '{paper_content}' placeholder required
+  completion_options:
+    temperature: 0.6
+  context_length: 98304
+rate:
+  top_k: 0
+  max_selected: 8
+  llm:
+    provider: siliconflow
+    api_key: env:SILICONFLOW_API_KEY
+    base_url: https://api.siliconflow.cn/v1
+    model: THUDM/glm-4-9b-chat
+    batch: false
+    user_prompt_template: 'Rate this paper based on: {paper_text} with criteria: {criteria_text}' # '{paper_text}' and '{criteria_text}' placeholder required
+    completion_options:
+      temperature: 0.2
+      max_tokens: 1024
+    context_length: 65536
+    criteria:
+      novelty:
+        description: How original and innovative are the contributions?
+        weight: 0.3
+      clarity:
+        description: How well-written and understandable is the paper?
+        weight: 0.2
+parse:
+  enable_vlm: false
+  tmp_dir: ./tmp
+batch:
+  tmp_dir: ./tmp
+  max_wait_hours: 24
+  poll_interval_seconds: 30
+  fallback_on_error: true
+cache:
+  dir: ~/.cache/arxiv-autosumm
+  ttl_days: 16
+render:
+  formats:
+  - pdf
+  - md
+  output_dir: ./output
+  md:
+    include_pagebreaks: true
+  pdf:
+    pdf_engine: xelatex
+    highlight_style: pygments
+    font_size: 14pt
+    document_class: extarticle
+    margin: 0.8in
+    colorlinks: true
+    link_color: RoyalBlue
+    line_stretch: 1.15
+    pandoc_input_format: markdown+raw_tex+yaml_metadata_block
+    pandoc_from_format: gfm
+  html:
+    math_renderer: mathjax
+    include_toc: true
+    toc_depth: 3
+    number_sections: false
+    standalone: true
+    self_contained: false
+    highlight_style: pygments
+    html5: true
+  azw3: {}
+deliver:
+  smtp_server: smtp.163.com
+  sender: arxiv_bot@163.com
+  recipient: email@uni.edu
+  password: env:SMTP_PASSWORD
+  port: 465
+  max_attachment_size_mb: 25.0

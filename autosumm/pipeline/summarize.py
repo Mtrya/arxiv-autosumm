@@ -97,7 +97,7 @@ def summarize(parsed_contents: List[str], config: SummarizerConfig, batch_config
     if not getattr(config, 'batch', False):
         # If batch is disabled, process sequentially
         client = SummarizerClient(config, batch_config)
-        results = [client.process_single(content) for content in parsed_contents]
+        results = [client.process_single(content, sleep_time=60) for content in parsed_contents]
         return [
             SummaryResult(
                 content=result or "",

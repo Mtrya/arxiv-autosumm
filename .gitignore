@@ -2,7 +2,6 @@ legacy*.py
 downloads/
 tmp/
 __pycache__
-config.yaml
 test_output
 main_.py
 *.txt
