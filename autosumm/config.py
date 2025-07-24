@@ -54,7 +54,8 @@ recognized_providers = {
     "minimax": "https://api.minimaxi.com/v1/text/chatcompletion_v2",
     "moonshot": "https://api.moonshot.cn/v1",
     "siliconflow": "https://api.siliconflow.cn/v1",
-    "volcengine": "https://ark.cn-beijing.volces.com/api/v3"
+    "volcengine": "https://ark.cn-beijing.volces.com/api/v3",
+    "modelscope": "https://api-inference.modelscope.cn/v1/"
 }
 
 valid_options = {
@@ -70,7 +71,7 @@ valid_options = {
 
 def validate_api_config(provider: Optional[str], base_url: Optional[str], api_key: Optional[str]) -> tuple[str, str, Optional[str]]:
     """
-    Reusable API configuration validation function.
+    Reusable API configuration validation function (most basic one, do not check connectivity).
     
     Returns:
         tuple: (provider, base_url, api_key) - all properly validated
@@ -114,7 +115,6 @@ def validate_api_config(provider: Optional[str], base_url: Optional[str], api_ke
         raise ValueError("Base URL cannot be empty after processing")
     
     return provider, base_url, api_key
-
 
 class RuntimeConfig(BaseModel):
     texlive_root: Optional[str]=None
@@ -347,6 +347,7 @@ class RaterLLMConfig(BaseModel):
         )
 
 class RaterConfig(BaseModel):
+    strategy: str="llm" # llm, embedder, hybrid
     top_k: int=0
     max_selected: int=8
     embedder: Optional[RaterEmbedderConfig]=None
@@ -354,6 +355,13 @@ class RaterConfig(BaseModel):
     """
     if top_k is 0, then RaterLLMConfig is not required; if top_k is 1000, then RaterEmbedderConfig is not required
     """
+
+    @field_validator('strategy')
+    @classmethod
+    def validate_strategy(cls, v) -> str:
+        if v not in ["llm", "embedder", "hybrid"]:
+            return "llm"
+        return v
 
     @field_validator('top_k')
     @classmethod
@@ -363,21 +371,22 @@ class RaterConfig(BaseModel):
     @field_validator('embedder')
     @classmethod
     def validate_embedder(cls, v, info):
-        top_k = info.data.get('top_k', 200)
-        if top_k > 0 and v is None:
-            raise ValueError("embedder config required when top_k > 0. To use llm for rating entirely, set top_k to 0")
+        strategy = info.data.get('strategy', "llm")
+        if strategy != "llm" and v is None:
+            raise ValueError("embedder config required when using strategy 'embedder' or 'hybrid'. To use llm for rating entirely, set strategy to 'llm'")
         return v
     
     @field_validator('llm')
     @classmethod
     def validate_llm(cls, v, info):
-        top_k = info.data.get('top_k',200)
-        if top_k < 1000 and v is None:
-            raise ValueError("llm config required when top_k < 1000. To use embedder for rating entirely, set top_k to 1000")
+        strategy = info.data.get('strategy',"llm")
+        if strategy != "embedder" and v is None:
+            raise ValueError("llm config required when using strategy 'llm' or 'hybrid'. To use embedder for rating entirely, set strategy to 'embedder'")
         return v
     
     def to_pipeline_config(self):
         return RaterConfig_(
+            strategy=self.strategy,
             top_k=self.top_k,
             max_selected=self.max_selected,
             embedder=self.embedder.to_pipeline_config() if self.embedder else None,
@@ -550,10 +559,22 @@ class HTMLRendererConfig(BaseModel):
         )
 
 class AZW3RendererConfig(BaseModel):
-    pass
-
+    calibre_path: Optional[str] = None  # Path to ebook-convert executable
+    author: str = "ArXiv AutoSumm"
+    title: Optional[str] = None
+    language: str = "en"
+    description: Optional[str] = None
+    cover_image: Optional[str] = None
+    
     def to_pipeline_config(self):
-        pass
+        return AZW3RendererConfig_(
+            calibre_path=self.calibre_path,
+            author=self.author,
+            title=self.title,
+            language=self.language,
+            description=self.description,
+            cover_image=self.cover_image
+        )
 
 class RendererConfig(BaseModel):
     formats: List[str]=["pdf","md"]

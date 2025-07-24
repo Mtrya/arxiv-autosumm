@@ -5,7 +5,7 @@ Automated research paper summarization from ArXiv with LLM-powered rating and de
 ## What Works Now
 
 **Core 15-step pipeline**: fetch -> parse -> rate -> summarize -> render -> deliver  
-**CLI interface**: `autosumm run` and `autosumm init`  
+**CLI interface**: `python autosumm/cli.py run` and `python autosumm/cli.py init`  
 **Local installation**: Works with git clone, then pip install  
 **Multiple formats**: HTML, Markdown (always), PDF (with TeXLive), AZW3 (coming soon)  
 **Smart caching**: SQLite-based with TTL and config change detection  

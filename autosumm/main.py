@@ -4,12 +4,11 @@ Complete ArXiv-AutoSumm summarization workflow
 
 import logging
 from datetime import date
-from pathlib import Path
 from typing import Optional, List
 from dataclasses import dataclass
 
 from pipeline import (
-    Cacher, fetch, RendererConfig,
+    Cacher, fetch,
     parse_fast, parse_vlm,
     rate_embed, rate_llm,
     summarize, render, deliver
@@ -207,45 +206,17 @@ def summarize_paper(papers: List[PaperMetadata], cacher: Cacher, summarize_confi
         logger.info(f"Successfully generated {successful_summaries} out of {len(papers)} summaries")
 
         renderable_papers = []
-        failed_render_count = 0
-
         for paper in papers:
             if not paper.summary:
                 logger.warning(f"Skipping {paper.arxiv_id} - no summary generated")
                 continue
-                
-            test_render_config = RendererConfig(
-                formats=render_config.formats,
-                output_dir=render_config.output_dir,
-                base_filename=f"test",
-                md=render_config.md,
-                pdf=render_config.pdf,
-                html=render_config.html,
-                azw3=render_config.azw3
-            )
             
-            try:
-                render_results = render([paper.summary], "test", test_render_config)
-                all_succeeded = all(result.success for result in render_results)
-                
-                for result in render_results:
-                    if result.success and Path(result.path).exists():
-                        Path(result.path).unlink(missing_ok=True)
-                
-                if all_succeeded:
-                    renderable_papers.append(paper)
-                    cacher.mark_paper_processed(paper.arxiv_id, {})
-                    if verbose:
-                        logger.debug(f"Successfully rendered test for {paper.arxiv_id}")
-                else:
-                    failed_render_count += 1
-                    logger.warning(f"Test render failed for {paper.arxiv_id}")
-                    
-            except Exception as e:
-                failed_render_count += 1
-                logger.error(f"Summary for {paper.arxiv_id} failed to render: {e}")
+            renderable_papers.append(paper)
+            cacher.mark_paper_processed(paper.arxiv_id, {})
+            if verbose:
+                logger.debug(f"Successfully prepared summary for {paper.arxiv_id}")
         
-        logger.info(f"Successfully rendered {len(renderable_papers)} papers, {failed_render_count} failed")
+        logger.info(f"Successfully prepared {len(renderable_papers)} papers for rendering")
         return renderable_papers
     except Exception as e:
         logger.error(f"Summarize operation failed: {e}")
@@ -282,6 +253,9 @@ def run_pipeline(config_path, verbose: bool=False):
         category = categories[int(today.strftime('%j')) % len(categories)]
         logger.info(f"Processing category: {category} for date {today}")
         
+        print('-'*50)
+        print(config["fetch"].max_results)
+
         # 2&3. Fetch paper metadata and get cached ratings
         logger.info("Fetching new papers...")
         papers = fetch_new_papers(category, cacher, config["fetch"], verbose=verbose)
@@ -301,19 +275,19 @@ def run_pipeline(config_path, verbose: bool=False):
             return
 
         # 5&6&7. Rate papers (with embedder) + cache embedder ratings + select top-k papers
-        if config["rate"].top_k < 1000: # a large top_k means the user want to rely on llm selection, skip embedder rating
+        if config["rate"].strategy in ["embedder","hybrid"]:
             logger.info("Rating papers with embedding model...")
             papers = select_papers_embed(papers, cacher, config["rate"], config["batch"], verbose=verbose)
             logger.info(f"Selected {len(papers)} papers after embedding rating")
         else:
-            logger.info("Skipping embedder rating (top_k >= 1000)")
+            logger.info(f"Skipping embedder rating (using strategy {config["rate"].strategy})")
 
         # 8&9&10. Rate papers (with llm) + cache llm ratings + select max_selected papers to summarize
-        if config["rate"].top_k > 1: # a very small top_k means the user want to rely on embedder selection, skip llm rating
+        if config["rate"].strategy in ["llm","hybrid"]:
             logger.info("Rating papers with LLM...")
             papers = select_papers_llm(papers, cacher, config["rate"], config["batch"], verbose=verbose)
             logger.info(f"Selected {len(papers)} papers after LLM rating")
-        else: # if llm rating isn't used, still need to select max_selected papers instead of top_k papers
+        else: # need to select max_selected papers instead of top_k papers anyway
             logger.info("Skipping LLM rating (top_k <= 1)")
             papers = sorted(papers, key=lambda p: p.embed_score, reverse=True)
             papers = papers[:config["rate"].max_selected]

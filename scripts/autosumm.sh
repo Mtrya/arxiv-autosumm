@@ -9,7 +9,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Default configuration file
-DEFAULT_CONFIG="my_own_config.yaml"
+DEFAULT_CONFIG="config.yaml"
 
 # Function to display usage
 usage() {

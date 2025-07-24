@@ -41,9 +41,10 @@ class RaterLLMConfig:
 
 @dataclass
 class RaterConfig:
+    strategy: str
     top_k: int
     max_selected: int
-    embedder: RaterEmbedderConfig
+    embedder: Optional[RaterEmbedderConfig]
     llm: Optional[RaterLLMConfig]
 
 @dataclass
@@ -240,6 +241,7 @@ class RaterLLMClient(BaseClient):
                 final_score = weighted_sum / total_weight
             else:
                 final_score = 0.0
+                
         except Exception as e:
             print(f"error parsing response {response}: {e}")
             return 0.0

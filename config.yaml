@@ -25,13 +25,13 @@ summarize:
   base_url: https://api.deepseek.com/v1
   model: deepseek-reasoner
   batch: false
-  system_prompt: file:prompts/summ_lm/system.md # can use 'file:' pattern
+  system_prompt: file:prompts/summ_lm/system.md # use 'file:' pattern for cleaner config.yaml
   user_prompt_template: 'Summarize this research paper: {paper_content}' # '{paper_content}' placeholder required
   completion_options:
     temperature: 0.6
   context_length: 98304
 rate:
-  top_k: 0
+  top_k: 1000
   max_selected: 8
   llm:
     provider: siliconflow

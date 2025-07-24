@@ -346,7 +346,8 @@ def create_config_from_wizard() -> MainConfig:
             "completion_options": {"temperature": 0.6}
         },
         "rate": {
-            "top_k": 0, # To skip embedder, need to set top_k to 0
+            "strategy": "llm",
+            "top_k": 1000, # arbitrary for llm rating
             "max_selected": 8,
             "embedder": None,  # Skip embedder for simplicity - use LLM only
             "llm": {
