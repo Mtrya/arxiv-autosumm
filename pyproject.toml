@@ -33,7 +33,8 @@ dependencies = [
     "scikit-learn>=1.7.0",
     "tiktoken>=0.9.0",
     "tqdm>=4.67.1",
-    "python-dotenv>=0.9.9"
+    "python-dotenv>=0.9.9",
+    "typer[all]>=0.12.3"
 ]
 
 [project.scripts]

@@ -18,7 +18,7 @@ from .config import MainConfig
 """
 Models: API endpoints, authentication, model availability (batch availability if batch selected; vision availability for VLM if vlm enabled)
 Emails: Email connectivity and authentication
-External Dependencies: python libraries, texlive and pandoc availability if pdf & azw3 rendering selected
+External Dependencies: python libraries, texlive and pandoc availability if html, pdf or azw3 rendering selected
 """
 
 @dataclass
@@ -79,7 +79,7 @@ class ConfigValidator:
 
     def _validate_pandoc(self) -> ValidationResult:
         """Check Pandoc installation"""
-        print("Validating Pandoc installation for PDF & AZW3 conversion...")
+        print("Validating Pandoc installation for HTML, PDF or AZW3 conversion...")
         try:
             result = subprocess.run(["pandoc","--version"],
                                     capture_output=True,text=True,timeout=10)

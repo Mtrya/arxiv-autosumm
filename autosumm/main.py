@@ -306,7 +306,7 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
             papers = select_papers_embed(papers, cacher, config["rate"], config["batch"], verbose=verbose)
             logger.info(f"Selected {len(papers)} papers after embedding rating")
         else:
-            logger.info(f"Skipping embedder rating (using strategy {config["rate"].strategy})")
+            logger.info(f"Skipping embedder rating (using strategy [{config["rate"].strategy}])")
 
         # 8&9&10. Rate papers (with llm) + cache llm ratings + select max_selected papers to summarize
         if config["rate"].strategy in ["llm","hybrid"]:
