@@ -1,6 +1,6 @@
 """Pydantic models with basic validations"""
 
-from pydantic import BaseModel, field_validator, ConfigDict, model_validator
+from pydantic import BaseModel, field_validator, ConfigDict, model_validator, ValidationError
 from typing import Optional, Dict, Any, Union, List
 import yaml
 from datetime import datetime
@@ -125,6 +125,8 @@ class RunConfig(BaseModel):
     @field_validator('categories')
     @classmethod
     def validate_categories(cls, v) -> List[str]:
+        if not v:
+            raise ValueError("No category selected. Please select at least one category.")
         for category in v:
             if category not in arxiv_categories:
                 raise ValueError(f"Invalid arXiv category: {category}")
@@ -635,31 +637,44 @@ class MainConfig(BaseModel):
     deliver: DelivererConfig
     """If batch or cache is not provided or is None, go with default settings."""
 
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_references(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            try:
+                return cls._resolve_references(data)
+            except ValueError as e:
+                # Wrap the low-level ValueError into a Pydantic ValidationError.
+                # This allows the calling code to handle all configuration errors uniformly.
+                raise ValidationError.from_exception_data(
+                    title=cls.__name__,
+                    line_errors=[
+                        {
+                            'type': 'value_error',
+                            # The error message from _resolve_references now contains the
+                            # full path, so we report it as a single, clear error message.
+                            'loc': ('config',),
+                            'msg': str(e),
+                            'input': 'file: or env: reference',
+                        }
+                    ],
+                )
+        return data
+
     @classmethod
     def from_yaml(cls, path: str) -> 'MainConfig':
         with open(path, 'r', encoding='utf-8') as f:
             data = yaml.safe_load(f)
 
-        data = cls._resolve_references(data)
+        # model_validator is called automatically when the model is initialized
+        #data = cls._resolve_references(data) 
 
         return cls(**data)
-    
-    def to_yaml(self, path: str) -> None:
-        Path(path).parent.mkdir(parents=True,exist_ok=True)
-
-        with open(path,'w', encoding='utf-8') as f:
-            yaml.dump(
-                self.model_dump(exclude_none=True),
-                f,
-                default_flow_style=False,
-                sort_keys=False,
-                indent=2
-            )
 
     @staticmethod
     def _resolve_references(data: Dict[str,Any]) -> Dict[str, Any]:
         """Recursively resolve 'file:path' and 'env:variable' references"""
-        load_dotenv()
+        load_dotenv() # load .env file
         if isinstance(data, dict):
             result = {}
             for key, value in data.items():
@@ -669,13 +684,14 @@ class MainConfig(BaseModel):
                         with open(filepath, 'r', encoding='utf-8') as f:
                             result[key] = f.read()
                     except Exception as e:
-                        raise ValueError(f"Failed to load file {filepath}: {e}")
+                        raise ValueError(f"Failed to load file '{filepath}'. Reason: {e}")
                 elif isinstance(value, str) and value.startswith('env:'):
                     envname = value[4:]
-                    try:
-                        result[key] = os.getenv(envname)
-                    except Exception as e:
-                        raise ValueError(f"Failed to get environmental variable {envname}: {e}")
+                    value = os.getenv(envname)
+                    if value is None:
+                        raise ValueError(f"Environment variable '{envname}' is not set or is empty.")
+                    else:
+                        result[key] = value
                 else:
                     result[key] = MainConfig._resolve_references(value)
             return result

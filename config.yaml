@@ -3,89 +3,68 @@ run:
   - cs.AI
   - cs.CV
   - cs.RO
+  - cs.SY
+  - math.OC
+  - astro-ph.EP
+  - physics.space-ph
   send_log: false
   log_dir: ./logs
+
 fetch:
   days: 8
   max_results: 1000
   max_retries: 10
+
 summarize:
   provider: modelscope
   api_key: env:MODELSCOPE_API_KEY
   base_url: https://api-inference.modelscope.cn/v1/
   model: Qwen/Qwen3-235B-A22B-Thinking-2507
-  batch: false
-  user_prompt_template: 'Summarize this research paper: {paper_content}'
+  system_prompt: file:./prompts/summ_lm/system.md
+  user_prompt_template: file:./prompts/summ_lm/user.md
   completion_options:
     temperature: 0.6
-  context_length: 98304
+
 rate:
   strategy: llm
   top_k: 200
   max_selected: 10
+  embedder: null
   llm:
-    provider: siliconflow
-    api_key: env:SILICONFLOW_API_KEY
-    base_url: https://api.siliconflow.cn/v1
-    model: THUDM/glm-4-9b-chat
-    batch: false
-    user_prompt_template: 'Rate this paper based on: {paper_text} with criteria: {criteria_text}'
+    provider: modelscope
+    api_key: env:MODELSCOPE_API_KEY
+    base_url: https://api-inference.modelscope.cn/v1/
+    model: Qwen/Qwen2.5-7B-Instruct
+    system_prompt: file:./prompts/rate_lm/system.md
+    user_prompt_template: file:./prompts/rate_lm/user.md
     completion_options:
       temperature: 0.2
       max_tokens: 1024
-    context_length: 65536
-    criteria:
-      novelty:
-        description: How original and innovative are the contributions?
-        weight: 0.3
-      clarity:
-        description: How well-written and understandable is the paper?
-        weight: 0.2
+
 parse:
   enable_vlm: false
   tmp_dir: ./tmp
-batch:
-  tmp_dir: ./tmp
-  max_wait_hours: 24
-  poll_interval_seconds: 30
-  fallback_on_error: true
-cache:
-  dir: ~/.cache/arxiv-autosumm
-  ttl_days: 16
+
 render:
   formats:
   - pdf
   - md
   output_dir: ./output
-  md:
-    include_pagebreaks: true
-  pdf:
-    pdf_engine: xelatex
-    highlight_style: pygments
-    font_size: 14pt
-    document_class: extarticle
-    margin: 0.8in
-    colorlinks: true
-    link_color: RoyalBlue
-    line_stretch: 1.15
-    pandoc_input_format: markdown+raw_tex+yaml_metadata_block
-    pandoc_from_format: gfm
-  html:
-    math_renderer: mathjax
-    include_toc: true
-    toc_depth: 3
-    number_sections: false
-    standalone: true
-    self_contained: false
-    highlight_style: pygments
-    html5: true
-  azw3:
-    author: ArXiv AutoSumm
-    language: en
+  base_filename: null
+
 deliver:
   smtp_server: smtp.163.com
-  sender: arxiv_bot@163.com
-  recipient: kaupane20@yeah.net
-  password: env:SMTP_PASSWORD
   port: 465
-  max_attachment_size_mb: 25.0
+  sender: arxiv_bot@163.com
+  recipient: arxiv_bot@163.com
+  password: env:SMTP_PASSWORD
+
+cache:
+  dir: ~/.cache/arxiv-autosumm
+  ttl_days: 16
+
+batch:
+  tmp_dir: ./tmp
+  max_wait_hours: 24
+  poll_interval_seconds: 30
+  fallback_on_error: true

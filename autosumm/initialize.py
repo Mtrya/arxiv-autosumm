@@ -9,12 +9,11 @@ Focuses on the 4 essential items only, with basic validation.
 import typer
 from typing import Dict, List, Optional
 from pathlib import Path
+from pydantic import ValidationError
+import yaml
 import re
-import getpass
 
 from config import MainConfig, arxiv_categories, recognized_providers, validate_api_config
-
-# TODO: remove host-level setup (mount point, autostart and schedule), focus on summary configs only
 
 def get_interactive_input(prompt: str, default: Optional[str] = None, 
                          validation_func=None, password: bool = False) -> str:
@@ -47,7 +46,7 @@ def validate_email(email: str) -> None:
 def select_categories_interactively() -> List[str]:
     """Interactive category selection."""
     typer.echo("\n📚 Select ArXiv Categories")
-    typer.echo("=" * 40)
+    typer.echo("=" * 60)
     
     # Common categories for quick selection
     common_categories = {
@@ -56,10 +55,15 @@ def select_categories_interactively() -> List[str]:
         "cs.CL": "Computation and Language (NLP)",
         "cs.CV": "Computer Vision",
         "cs.RO": "Robotics",
+        "cs.SY": "Systems and Control",
+        "math.OC": "Optimization and Control",
         "math.ST": "Statistics Theory",
         "stat.ML": "Machine Learning (Statistics)",
-        "q-bio.QM": "Quantitative Methods (Biology)",
-        "physics.comp-ph": "Computational Physics"
+        "astro-ph.EP": "Earth and Planetary Astrophysics",
+        "gr-qc": "General Relativity and Quantum Cosmology",
+        "physics.comp-ph": "Computational Physics",
+        "physics.space-ph": "Space Physics",
+        "q-bio.QM": "Quantitative Methods (Biology)"
     }
     
     typer.echo("Common categories:")
@@ -99,7 +103,7 @@ def select_categories_interactively() -> List[str]:
 def configure_llm_providers() -> Dict[str, any]:
     """Configure LLM providers for summarization and rating."""
     typer.echo("\n🤖 Configure LLM Provider")
-    typer.echo("=" * 40)
+    typer.echo("=" * 60)
     
     # Provider selection
     providers = list(recognized_providers.keys())
@@ -237,7 +241,7 @@ def configure_categories() -> Dict[str, any]:
 def configure_email() -> Dict[str, any]:
     """Configure email settings."""
     typer.echo("\n📧 Configure Email Delivery")
-    typer.echo("=" * 40)
+    typer.echo("=" * 60)
     
     # Common SMTP providers
     providers = {
@@ -270,7 +274,8 @@ def configure_email() -> Dict[str, any]:
     
     # Basic validation only - no connectivity test
     typer.echo("ℹ️  Basic email configuration accepted")
-    typer.echo("   Run 'python autosumm/cli.py test-config' to test API and email connectivity")
+    typer.echo("   Run 'python autosumm/cli.py test-config' to test dependencies and API & email connectivity")
+    typer.echo("=" * 60)
     
     return {
         "smtp_server": smtp_server,
@@ -281,7 +286,7 @@ def configure_email() -> Dict[str, any]:
     }
 
 
-def create_config_from_wizard() -> MainConfig:
+def create_config_from_wizard(config_path: str) -> MainConfig:
     """Create configuration through interactive wizard."""
     typer.echo("🚀 ArXiv AutoSumm Setup Wizard")
     typer.echo("=" * 50)
@@ -299,7 +304,7 @@ def create_config_from_wizard() -> MainConfig:
     # Step 3: Email Configuration
     email_config = configure_email()
     
-    # Create configuration with sensible defaults
+    # Step 4: Create configuration with sensible defaults
     config_data = {
         "run": {
             "categories": category_config["categories"],
@@ -316,7 +321,8 @@ def create_config_from_wizard() -> MainConfig:
             "api_key": llm_config["api_key"],
             "base_url": llm_config["base_url"],
             "model": llm_config["model"],
-            "user_prompt_template": "Summarize this research paper: {paper_content}",
+            "system_prompt": 'file:./prompts/summ_lm/system.md',
+            "user_prompt_template": 'file:./prompts/summ_lm/user.md',
             "completion_options": {"temperature": 0.6}
         },
         "rate": {
@@ -329,7 +335,8 @@ def create_config_from_wizard() -> MainConfig:
                 "api_key": llm_config["rater_api_key"],
                 "base_url": llm_config["rater_base_url"],
                 "model": llm_config["rater_model"],
-                "user_prompt_template": "Rate this paper based on: {paper_text} with criteria: {criteria_text}",
+                "system_prompt": 'file:./prompts/rate_lm/system.md',
+                "user_prompt_template": 'file:./prompts/rate_lm/user.md',
                 "completion_options": {"temperature": 0.2, "max_tokens": 1024}
             }
         },
@@ -355,23 +362,51 @@ def create_config_from_wizard() -> MainConfig:
         }
     }
     
-    # Validate the configuration using pydantic before saving
+    # Step 5: Write the raw config data with 'file:' and 'env:' references to the YAML file
     try:
-        config = MainConfig(**config_data)
-        typer.echo("✅ Basic onfiguration validation passed")
-        return config
+        with open(config_path,'w',encoding='utf-8') as f:
+            for i, (key,value) in enumerate(config_data.items()):
+                if i > 0:
+                    f.write('\n')
+                yaml.dump(
+                    {key:value},
+                    f,
+                    sort_keys=False,
+                    indent=2,
+                    default_flow_style=False,
+                    allow_unicode=True
+                )
     except Exception as e:
-        typer.echo(f"❌ Basic configuration validation failed: {e}")
+        typer.echo(f"\n❌ Failed to write initial configuration to {config_path}: {e}")
+        raise typer.exit(1)
+    
+
+    # Step 6: Validate the configuration by loading it from the YAML file
+    try:
+        typer.echo()
+        typer.echo("Running basic configuration validation...")
+        config = MainConfig.from_yaml(config_path) # use .from_yaml instead of MainConfig(**config_data) makes sure the config.yaml file keeps 'file:' references instead of long, long string
+        typer.echo("\n✅ Basic onfiguration validation passed")
+        return config
+    except ValidationError as e:
+        typer.echo("\n❌ Basic configuration validation failed. Please review the errors below:")
+        typer.echo("=" * 60)
+        for error in e.errors():
+            field = " -> ".join(str(loc) for loc in error["loc"])
+            message = error["msg"]
+            typer.echo(f"  - Field `{field}`: {message}")
+        typer.echo("=" * 60)
+        typer.echo("Please run the setup wizard again to correct the configuration.")
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.echo(f"\n❌ Basic configuration validation failed: {e}")
         raise typer.Exit(1)
 
 
 def run_setup_wizard(config_path: str = "config.yaml") -> None:
     """Run the complete setup wizard."""
     try:
-        config = create_config_from_wizard()
-        
-        # Save configuration
-        config.to_yaml(config_path)
+        config = create_config_from_wizard(config_path)
         
         typer.echo("\n✅ Setup completed successfully!")
         typer.echo(f"Configuration saved to: {config_path}")
@@ -387,4 +422,4 @@ def run_setup_wizard(config_path: str = "config.yaml") -> None:
 
 
 if __name__ == "__main__":
-    run_setup_wizard()
+    config = MainConfig.from_yaml("config.yaml")
