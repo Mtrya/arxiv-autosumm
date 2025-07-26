@@ -20,7 +20,7 @@ Here are some execution constraints:
 3. Avoid industry slang, you should use plain and approachable English.
 4. Use LaTeX math. (single dollar for inline math "$...$", and double dollar for displayed math "$$...$$")
 5. Use Markdown format. ("###" before subsections, "**...**" to highlight key concepts)
-6. Start directly, do not add a title.
+6. Start with paper title and other metadata
 
 Paper:
 

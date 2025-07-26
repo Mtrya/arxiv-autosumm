@@ -186,7 +186,7 @@ def deliver(file_paths: List[str], config: DelivererConfig, subject: Optional[st
             server.login(config.sender, config.password)
             server.sendmail(config.sender, config.recipient, msg.as_string())
             
-        print(f"Email sent successfully to {config.recipient}")
+        print(f"Email sent to {config.recipient} successfully")
         print(f"Total email size: {email_size_mb:.2f}MB")
         print(f"Files attached: {len(files_sent + error_files)}")
         
