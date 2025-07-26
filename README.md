@@ -1,137 +1,367 @@
 # ArXiv AutoSumm
 
-Automated research paper summarization from ArXiv with LLM-powered rating and delivery.
+Automated research paper summarization from ArXiv with LLM-powered rating, multi-format delivery, and comprehensive configuration management.
 
-## What Works Now
+## 🚀 What Works Now
 
-**Core 15-step pipeline**: fetch -> parse -> rate -> summarize -> render -> deliver  
-**CLI interface**: `python autosumm/cli.py run` and `python autosumm/cli.py init`  
-**Local installation**: Works with git clone, then pip install  
-**Multiple formats**: HTML, Markdown (always), PDF (with TeXLive), AZW3 (coming soon)  
-**Smart caching**: SQLite-based with TTL and config change detection  
-**Multiple LLM providers**: DashScope, SiliconFlow, Ollama, OpenAI, etc.
-**VLM powered paper parsing**: Keep table and image structure, but need extra configuration (default disable vlm)
+**✅ Complete 15-step pipeline**: fetch → parse → rate → summarize → render → deliver  
+**✅ CLI**: Interactive setup, configuration testing, and summarization pipeline running 
+**✅ Multi-format output**: Markdown, HTML, PDF, AZW3 (Kindle)  
+**✅ Smart caching**: SQLite-based with TTL, config change detection, and rate limiting  
+**✅ VLM-powered parsing**: Vision Language Model OCR for enhanced PDF processing  
+**✅ Comprehensive validation**: API connectivity, dependency checks, and error handling  
+**✅ Environment variables**: Full .env support with secure credential management
 
-## Quick Start
+## 📦 Installation
 
-### 1. Install Dependencies
+### Method 1: Development Installation
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/Mtrya/arxiv-autosumm.git
+cd arxiv-autosumm
+pip install -e .
 ```
 
-### 2. Configure
-Copy the template and edit:
-```bash
-cp config.yaml my_own_config.yaml
-# Edit my_own_config.yaml with your API keys and email settings
+### Method 2: Using Docker
+**Not Implemented, Coming Soon**
 ```
 
-### 3. Run
-```bash
-# Interactive setup (optional but recommended)
-python autosumm/cli.py init
+## ⚡ Quick Start
 
-# Run the pipeline
-python autosumm/cli.py run
+### 1. Interactive Setup (Recommended)
+```bash
+autosumm init
+```
+This will guide you through:
+- LLM provider selection and API key setup
+- ArXiv categories configuration
+- Email delivery setup
+- Validation and testing
+
+### 2. Manual Configuration
+```bash
+cp config.yaml my_config.yaml
+# Edit my_config.yaml with your custom settings
+autosumm test-config --config my_config.yaml # test if config is valid
+autosumm run --config my_config.yaml # run pipeline
 ```
 
-## Configuration
+### 3. Environment Variables
+Use `.env` file or environment variables for sensitive data:
+```bash
+# .env file
+DASHSCOPE_API_KEY=your-key-here
+SMTP_PASSWORD=your-app-password
+```
 
-Use `config.yaml` as your template. **Required changes**:
+### 4. Start with CLI Commands
+```bash
+# Interactive setup wizard
+autosumm init [--config path/to/config.yaml]
 
+# Run the complete pipeline
+autosumm run [--config path/to/config.yaml] [--verbose] [--category an_arxiv_category]
+
+# Test configuration and connectivity
+autosumm test_config [--config path/to/config.yaml] [--skip-api-checks]
+
+# Get help
+autosumm --help
+autosumm [command] --help
+```
+
+## Recommended Usage
+
+### Automated Daily Summaries with Cron
+
+Set up automated daily paper summaries using cron:
+
+```bash
+# Add to crontab (crontab -e)
+# Run daily at 8 AM
+0 8 * * * cd /path/to/arxiv-autosumm && autosumm run --config my_config.yaml
+
+# Run weekly on Monday at 9 AM
+0 9 * * 1 cd /path/to/arxiv-autosumm && autosumm run --config my_config.yaml
+```
+
+### Systemd Timer (Modern Alternative)
+
+Create a systemd service for more reliable scheduling:
+
+```bash
+# Create service file: ~/.config/systemd/user/arxiv-autosumm.service
+[Unit]
+Description=ArXiv AutoSumm Daily Pipeline
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/path/to/arxiv-autosumm
+ExecStart=/usr/bin/python3 -m autosumm.cli run --config my_config.yaml
+
+# Create timer file: ~/.config/systemd/user/arxiv-autosumm.timer
+[Unit]
+Description=Run ArXiv AutoSumm daily
+Requires=arxiv-autosumm.service
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Enable and start:
+```bash
+systemctl --user daemon-reload
+systemctl --user enable arxiv-autosumm.timer
+systemctl --user start arxiv-autosumm.timer
+systemctl --user list-timers
+```
+
+### Manual CLI Usage
+
+**Daily workflow:**
+```bash
+# Run pipeline with one of the category
+autosumm run
+
+# Run pipeline with specified category
+autosumm run --category cs.AI
+
+# Debug mode with verbose output
+autosumm run --verbose
+```
+
+## Pipeline Description
+
+The complete chronological pipeline processes research papers in the exact order of execution:
+
+**1. Fetch** - Downloads paper metadata from ArXiv using configured categories or date ranges
+**2. Deduplication** - Uses SQLite cache to skip already-processed papers, preventing redundant work
+**3. Rate Limiting** - Respects ArXiv API limits with exponential backoff to avoid being blocked
+**4. PDF Download** - Retrieves full PDFs for newly discovered papers
+**5. Fast Parse** - Extracts text using PyPDF2 for quick initial processing
+**6. Embedder Rate** *(Optional)* - Uses embedding similarity to select top-k papers based on relevance to your interests
+**7. LLM Rate** *(Optional)* - Uses language models to score papers on configured criteria (novelty, methodology, clarity)
+**8. VLM Parse** *(Optional)* - Uses Vision Language Models for enhanced OCR on complex layouts and figures
+**9. Summarize** - Generates concise technical summaries using your configured LLM
+**10. Render** - Creates outputs in PDF, HTML, Markdown, or AZW3 formats
+**11. Deliver** - Sends formatted summaries via email
+
+### Rating Strategies
+You can configure three different rating approaches based on your needs:
+
+- **llm**: Uses only LLM rating (most accurate, higher cost)
+- **embedder**: Uses only embedding similarity (faster, lower cost)
+- **hybrid**: Uses embedder -> LLM hierarchical rating (balanced approach)
+
+Configure in `config.yaml`:
 ```yaml
-# LLM Configuration
-summarize:
-  provider: "dashscope"  # or "siliconflow", "openai", or just write anything as long as the base url is correct.
-  api_key: "YOUR_API_KEY_HERE"  # Get from your provider
-  model: "qwen-turbo"
-
-# Email Configuration  
-deliver:
-  smtp_server: "smtp.gmail.com"
-  sender: "your_email@gmail.com"
-  recipient: "your_email@gmail.com"
-  password: "YOUR_APP_PASSWORD"  # App password, not regular password
+rate:
+  strategy: llm  # llm, embedder or hybrid
+  top_k: 80 # if strategy is hybrid, set this parameter
 ```
 
-See `config.yaml` for all available options and sensible defaults.
+## 📊 Output Formats
 
-## CLI Commands
+| Format | Dependencies | Notes |
+|--------|--------------|--------|
+| **Markdown** | None | Primary format, includes metadata |
+| **HTML** | pandoc | MathJax support for equations |
+| **PDF** | TeXLive + pandoc | Uses XeLaTeX engine, includes bibliography |
+| **AZW3** | Calibre (ebook-convert) + pandoc | Kindle format with table of contents |
 
-### `autosumm run`
-Run the complete pipeline with your config:
-```bash
-python autosumm/cli.py run --config my_own_config.yaml --verbose
-```
-
-### `autosumm init`
-Interactive setup wizard (creates/edits config):
-```bash
-python autosumm/cli.py init --config my_own_config.yaml
-```
-
-## Output Formats
-
-| Format | Status | Requirements |
-|--------|--------|--------------|
-| **Markdown** | Always available | None |
-| **HTML** | Always available | None |
-| **PDF** |  Requires TeXLive | Install `texlive-latex-base texlive-latex-extra texlive-xetex pandoc` |
-| **AZW3** |  Coming soon | - |
-
-## Known Limitations
-
-- **AZW3 conversion**: Not yet implemented
-- **PDF generation**: Requires TeXLive installation (large download)
-- **Docker support**: Containerization in progress
-- **Testing**: Limited real-world usage, expect some rough edges
-- **Config validation**: Basic validation only, will improve
-
-## Troubleshooting
-
-### API Key Setup
-
-**DashScope (Alibaba)**:
-```yaml
-summarize:
-  provider: "dashscope"
-  api_key: "sk-your-key-here"
-  model: "qwen-turbo"
-```
-
-**SiliconFlow**:
-```yaml
-summarize:
-  provider: "siliconflow"
-  api_key: "sk-your-key-here"
-  model: "deepseek-ai/DeepSeek-V2.5"
-```
-
-**Ollama (local)**:
-```yaml
-summarize:
-  provider: "ollama"
-  base_url: "http://localhost:11434"
-  model: "llama3.1"
-  # No API key needed for local
-```
-
-### Common Issues
-
-**PDF generation fails**:
+### Format Requirements
 ```bash
 # Ubuntu/Debian
-sudo apt-get install texlive-latex-base texlive-latex-extra texlive-xetex pandoc
-
-# macOS
-brew install --cask mactex
+sudo apt-get install texlive-latex-base texlive-latex-extra texlive-xetex pandoc calibre
 ```
 
-**Email delivery fails**:
-- Use app-specific password (not regular email password)
-- Check SMTP server settings
-- Verify port 465 (SSL) or 587 (TLS)
+## Basic Configuration
 
-**API connection issues**:
-- Test with: `curl -H "Authorization: Bearer YOUR_KEY" https://api.provider.com/v1/models`
-- Check rate limits on your provider
+### Run
+```yaml
+run:
+  categories: ["cs.AI", "cs.RO"] # arxiv categories you're interested in.
+  send_log: false # whether to deliver logfile as well as summaries
+  log_dir: ./logs # where to store logfiles  
+```
+
+### Fetch
+```yaml
+fetch:
+  days: 8
+  max_results: 200
+  max_retries: 10
+```
+
+### Summarizer Config
+```yaml
+summarize:
+  provider: deepseek
+  api_key: env:DEEPSEEK_API_KEY # use environmental variable
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-reasoner # use a powerful reasoner model as summarizer
+  batch: False # disable batch processing
+  system_prompt: null # it's ok to use empty system prompt
+  user_prompt_template: file:./prompts/summ_lm/user.md # user prompt template for summarizer, must contain {paper_content} placeholder
+  completion_options:
+    temperature: 0.6
+    # can add other completion options such as top_k, top_p, etc.
+  context_length: 131072 # default to 131072, this parameter decides how paper content will be truncated to fit in model's context length
+```
+
+### Paper Rating
+```yaml
+rate:
+  strategy: llm # llm, embedder or hybrid
+  top_k: 80    # maximum papers to pass to LLM for rating (after embedder filtering)
+  max_selected: 10  # final papers to summarize (after LLM rating)
+  embedder: null
+  llm:
+    provider: modelscope
+    api_key: env:MODELSCOPE_API_KEY
+    base_url: https://api-inference.modelscope.cn/v1/
+    model: Qwen/Qwen2.5-7B-Instruct
+    system_prompt: file:./prompts/rate_lm/system.md
+    user_prompt_template: file:./prompts/rate_lm/user.md
+    completion_options:
+      temperature: 0.2
+      max_tokens: 1024
+    context_length: 32768
+    criteria:
+      novelty:
+        description: How original and innovative are the contributions?
+        weight: 0.3
+      methodology:
+        description: How rigorous is the experimental design and evaluation?
+        weight: 0.25
+      clarity:
+        description: How well-written and understandable is the paper?
+        weight: 0.2
+```
+
+**Parameter Flow:**
+- **fetch:max_results** → initial paper limit from ArXiv
+- **rate:top_k** → papers passed to LLM for rating (after optional embedder filtering)
+- **rate:max_selected** → final papers selected for optional vlm parsing and summarization (after rating)
+
+### Render Config
+```yaml
+render:
+  formats: ["pdf", "md"] # summaries' formats, default setting gives you .pdf and .md files
+  output_dir: ./output # autosumm will output these summaries to output_dir, then deliver to you via email
+  base_filename: null # default to "summary". Summary naming is {base_filename}_{category}_{year}_{week}.{extension_name}
+```
+
+### Deliver and Email
+```yaml
+deliver:
+  smtp_server
+  port: 465
+  sender: env:SENDER
+  recipient: env:RECIPIENT
+  password: env:SMTP_PASSWORD
+```
+
+### Default LLM Providers
+| Provider | Example Model | Notes |
+|----------|---------------|--------|
+| **OpenAI** | gpt-4o, gpt-4o-mini | Requires OPENAI_API_KEY |
+| **DeepSeek** | deepseek-reasoner | Requires DEEPSEEK_API_KEY |
+| **DashScope** | qwen-plus, qwen-turbo | Requires DASHSCOPE_API_KEY |
+| **SiliconFlow** | deepseek-ai/DeepSeek-R1 | Requires SILICONFLOW_API_KEY |
+| **Ollama** | qwen3:32b, llama3.1:8b | Requires Local Installation |
+| **Moonshot** | kimi-k2-0711-preview | Requires MOONSHOT_API_KEY |
+| **Minimax** | MiniMax-Text-01 | Requires MINIMAX_API_KEY |
+| **ModelScope** | Qwen/Qwen3-235B-A22B-Thinking-2507 | Requires MODELSCOPE_API_KEY |
+
+## Common Issues
+
+**API Connection Problems**
+```bash
+# Test API connectivity
+curl -H "Authorization: Bearer YOUR_KEY" \
+  https://api.provider.com/v1/models
+
+# Check provider configuration
+autosumm test-config # check connectiviy, authentication, batch/vision support (if configured) and completion_options validity
+```
+
+**Email Delivery Issues**
+```bash
+# Test SMTP connection
+autosumm test-config --skip-api-checks
+```
+
+**PDF Generation Fails**
+```bash
+# Check TeXLive installation
+which xelatex
+which pandoc
+
+# Install missing packages
+sudo apt-get install texlive-latex-base texlive-latex-extra texlive-xetex pandoc
+
+# Then test again with autosumm test-config --skip-api-checks
+autosumm test-config --skip-api-checks
+```
+
+**AZW3 Conversion Issues**
+```bash
+# Check Calibre installation
+which ebook-convert
+
+# Test conversion manually
+ebook-convert input.html output.azw3
+
+# Specify calibre_path in config.yaml if necessary
+# Then test again with autosumm test-config --skip-api-checks
+autosumm test-config --skip-api-checks
+```
+
+## Environment Setup
+
+**Setting up .env file**
+```bash
+# Create .env file
+cat > .env << EOF
+DASHSCOPE_API_KEY=your-dashscope-key
+OPENAI_API_KEY=your-openai-key
+SMTP_PASSWORD=your-app-password
+EMAIL_SENDER=your-email@gmail.com
+EMAIL_RECIPIENT=your-email@gmail.com
+EOF
+
+# Make sure .env is in your working directory
+autosumm run --config my_config.yaml
+```
+
+You can also set these variables in ~/.bashrc, ~/.zshrc, etc. Using your API keys directly without hiding it is also totally fine, as long as you're sure about the safety issue.
+
+
+## 🚨 Known Limitations
+
+- **Docker support**: Not yet implemented (planned)
+- **Unit tests**: Limited test coverage (project is stable (in my use case) but needs more tests)
+- **Linux native**: Not tested on Windows or MacOS yet
+- **Rate limiting**: Some providers may have aggressive rate limits
+- **VLM Parsing**: Enabling VLM parsing may require significant time and tokens, especially for large PDFs, and the parsing quality is not guaranteed (rely on the specific model and prompts)
+
+## Future Plan:
+
+- **Docker**: Add docker support. Will probably add a setup.sh for local build while also preparing an docker image for immediate use
+- **Convenient Tests**: Add cli commands to do unit tests, enabling users to quickly find the prompt best tailored to their model
+- **Cross Platform**: Add Window support. I don't have a Mac and have never used MacOS before, so I'm afraid I can't test it on MacOS. Welcome contributions.
+- **More Providers**: Support Anthropic/Gemini/Zhipu/Volc/... compatible SDK
+- **Audio Formats**: Use TTS models to convert summaries to speech
+
+## 🔧 Advanced Configuration
+
+### Coming soon
+
+## 📄 License
+
+MIT License - see LICENSE file for details.
