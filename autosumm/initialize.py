@@ -13,7 +13,7 @@ from pydantic import ValidationError
 import yaml
 import re
 
-from config import MainConfig, arxiv_categories, recognized_providers, validate_api_config
+from .config import MainConfig, arxiv_categories, recognized_providers, validate_api_config
 
 def get_interactive_input(prompt: str, default: Optional[str] = None, 
                          validation_func=None, password: bool = False) -> str:
@@ -274,7 +274,7 @@ def configure_email() -> Dict[str, any]:
     
     # Basic validation only - no connectivity test
     typer.echo("ℹ️  Basic email configuration accepted")
-    typer.echo("   Run 'python autosumm/cli.py test-config' to test dependencies and API & email connectivity")
+    typer.echo("   Run 'autosumm test-config' to test dependencies and API & email connectivity")
     typer.echo("=" * 60)
     
     return {
@@ -292,7 +292,7 @@ def create_config_from_wizard(config_path: str) -> MainConfig:
     typer.echo("=" * 50)
     typer.echo("This wizard will help you configure the essential settings.")
     typer.echo("You can always modify the configuration file later.")
-    typer.echo("Run 'python autosumm/cli.py test_config' to test connectivity after setup.")
+    typer.echo("Run 'autosumm test-config' to test connectivity after setup.")
     typer.echo()
     
     # Step 1: LLM Configuration
@@ -313,7 +313,7 @@ def create_config_from_wizard(config_path: str) -> MainConfig:
         },
         "fetch": {
             "days": 8,
-            "max_results": 1000,
+            "max_results": 200,
             "max_retries": 10
         },
         "summarize": {
@@ -321,13 +321,15 @@ def create_config_from_wizard(config_path: str) -> MainConfig:
             "api_key": llm_config["api_key"],
             "base_url": llm_config["base_url"],
             "model": llm_config["model"],
+            "batch": False,
             "system_prompt": 'file:./prompts/summ_lm/system.md',
             "user_prompt_template": 'file:./prompts/summ_lm/user.md',
-            "completion_options": {"temperature": 0.6}
+            "completion_options": {"temperature": 0.6},
+            "context_length": 131072
         },
         "rate": {
             "strategy": "llm",
-            "top_k": 200, # arbitrary for llm rating
+            "top_k": 80, # arbitrary for llm rating
             "max_selected": 10,
             "embedder": None,  # Skip embedder for simplicity - use LLM only
             "llm": {
@@ -335,14 +337,26 @@ def create_config_from_wizard(config_path: str) -> MainConfig:
                 "api_key": llm_config["rater_api_key"],
                 "base_url": llm_config["rater_base_url"],
                 "model": llm_config["rater_model"],
+                "batch": False,
                 "system_prompt": 'file:./prompts/rate_lm/system.md',
                 "user_prompt_template": 'file:./prompts/rate_lm/user.md',
-                "completion_options": {"temperature": 0.2, "max_tokens": 1024}
+                "completion_options": {"temperature": 0.2, "max_tokens": 1024},
+                "context_length": 32768,
+                "criteria": {
+                    "novelty": {
+                        "description": "How original and innovative are the contributions?",
+                        "weight": 0.3
+                    },
+                    "methodology":{
+                        "description": "How rigorous is the experimental design and evaluation?",
+                        "weight": 0.25
+                    },
+                    "clarity": {
+                        "description": "How well-written and understandable is the paper?",
+                        "weight": 0.2
+                    }
+                }
             }
-        },
-        "parse": {
-            "enable_vlm": False,
-            "tmp_dir": "./tmp"
         },
         "render": {
             "formats": ["pdf", "md"],
@@ -350,16 +364,6 @@ def create_config_from_wizard(config_path: str) -> MainConfig:
             "base_filename": None
         },
         "deliver": email_config,
-        "cache": {
-            "dir": "~/.cache/arxiv-autosumm",
-            "ttl_days": 16
-        },
-        "batch": {
-            "tmp_dir": "./tmp",
-            "max_wait_hours": 24,
-            "poll_interval_seconds": 30,
-            "fallback_on_error": True
-        }
     }
     
     # Step 5: Write the raw config data with 'file:' and 'env:' references to the YAML file
@@ -412,9 +416,8 @@ def run_setup_wizard(config_path: str = "config.yaml") -> None:
         typer.echo(f"Configuration saved to: {config_path}")
         typer.echo("\nNext steps:")
         typer.echo(f"1. Review the configuration: {config_path}")
-        typer.echo("2. Test connectivity: python autosumm/cli.py test_config")
-        typer.echo("3. Run pipeline: python autosumm/main.py")
-        typer.echo("4. Or use: python autosumm/cli.py run")
+        typer.echo("2. Test connectivity: autosumm test-config")
+        typer.echo("3. Run pipeline: autosumm run")
         
     except Exception as e:
         typer.echo(f"\n❌ Setup failed: {e}", err=True)

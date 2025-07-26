@@ -22,7 +22,7 @@ def init(
     4. Email Configuration
     """
     try:
-        from initialize import run_setup_wizard
+        from .initialize import run_setup_wizard
         
         # Check if config already exists
         config_file = Path(config_path)
@@ -54,13 +54,18 @@ def run(
         "-c",
         help="Path to configuration file"
     ),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
+    specified_category: str = typer.Option(
+        "cs.AI",
+        "--specify-category",
+        "-s"
+    )
 ):
     """
     Run the summarization pipeline.
     """
     try:
-        from main import run_pipeline
+        from .main import run_pipeline
         
         config_file = Path(config_path)
         if not config_file.exists():
@@ -71,7 +76,7 @@ def run(
         if verbose:
             typer.echo("Verbose mode enabled")
             
-        run_pipeline(str(config_path), verbose)
+        run_pipeline(str(config_path), verbose, specified_category)
         typer.echo("Pipeline completed successfully!")
         
     except ImportError as e:
@@ -99,9 +104,8 @@ def test_config(
     Test API connectivity, model availability and email connectivity.
     """
     try:
-        from validate import ConfigValidator, MainConfig
-        from validate import ValidationResult
-        
+        from .validate import ConfigValidator, MainConfig, ValidationResult
+
         config_file = Path(config_path)
         if not config_file.exists():
             typer.echo(f"Error: Configuration file '{config_path}' not found.", err=True)

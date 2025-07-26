@@ -12,7 +12,7 @@ run:
 
 fetch:
   days: 8
-  max_results: 1000
+  max_results: 200
   max_retries: 10
 
 summarize:
@@ -20,14 +20,16 @@ summarize:
   api_key: env:MODELSCOPE_API_KEY
   base_url: https://api-inference.modelscope.cn/v1/
   model: Qwen/Qwen3-235B-A22B-Thinking-2507
+  batch: false
   system_prompt: file:./prompts/summ_lm/system.md
   user_prompt_template: file:./prompts/summ_lm/user.md
   completion_options:
     temperature: 0.6
+  context_length: 131072
 
 rate:
   strategy: llm
-  top_k: 200
+  top_k: 80
   max_selected: 10
   embedder: null
   llm:
@@ -35,15 +37,23 @@ rate:
     api_key: env:MODELSCOPE_API_KEY
     base_url: https://api-inference.modelscope.cn/v1/
     model: Qwen/Qwen2.5-7B-Instruct
+    batch: false
     system_prompt: file:./prompts/rate_lm/system.md
     user_prompt_template: file:./prompts/rate_lm/user.md
     completion_options:
       temperature: 0.2
       max_tokens: 1024
-
-parse:
-  enable_vlm: false
-  tmp_dir: ./tmp
+    context_length: 32768
+    criteria:
+      novelty:
+        description: How original and innovative are the contributions?
+        weight: 0.3
+      methodology:
+        description: How rigorous is the experimental design and evaluation?
+        weight: 0.25
+      clarity:
+        description: How well-written and understandable is the paper?
+        weight: 0.2
 
 render:
   formats:
@@ -56,15 +66,5 @@ deliver:
   smtp_server: smtp.163.com
   port: 465
   sender: arxiv_bot@163.com
-  recipient: arxiv_bot@163.com
+  recipient: kaupane20@yeah.net
   password: env:SMTP_PASSWORD
-
-cache:
-  dir: ~/.cache/arxiv-autosumm
-  ttl_days: 16
-
-batch:
-  tmp_dir: ./tmp
-  max_wait_hours: 24
-  poll_interval_seconds: 30
-  fallback_on_error: true

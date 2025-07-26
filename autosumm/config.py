@@ -5,11 +5,11 @@ from typing import Optional, Dict, Any, Union, List
 import yaml
 from datetime import datetime
 from pathlib import Path
-from dotenv import load_dotenv
+from dotenv import main
 import os
 import re
 
-from pipeline import (
+from .pipeline import (
     FetcherConfig as FetcherConfig_,
     ParserConfig as ParserConfig_,
     ParserVLMConfig as ParserVLMConfig_,
@@ -630,12 +630,12 @@ class MainConfig(BaseModel):
     fetch: FetcherConfig
     summarize: SummarizerConfig
     rate: RaterConfig
-    parse: ParserConfig
+    parse: ParserConfig=ParserConfig()   
     batch: BatchConfig=BatchConfig()
     cache: CacherConfig=CacherConfig()
     render: RendererConfig
     deliver: DelivererConfig
-    """If batch or cache is not provided or is None, go with default settings."""
+    """If parse, batch or cache is not provided or is None, go with default settings."""
 
     @model_validator(mode="before")
     @classmethod
@@ -674,7 +674,7 @@ class MainConfig(BaseModel):
     @staticmethod
     def _resolve_references(data: Dict[str,Any]) -> Dict[str, Any]:
         """Recursively resolve 'file:path' and 'env:variable' references"""
-        load_dotenv() # load .env file
+        main.load_dotenv() # load .env file
         if isinstance(data, dict):
             result = {}
             for key, value in data.items():

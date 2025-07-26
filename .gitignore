@@ -8,3 +8,5 @@ main_.py
 my_own_config.yaml
 output
 CLAUDE.md
+*.egg-info
+.env

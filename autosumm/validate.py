@@ -10,11 +10,11 @@ from typing import Dict, List, Tuple, Any, Optional
 from dataclasses import dataclass
 import requests
 
-from pipeline import (
+from .pipeline import (
     summarize, parse_vlm, rate_llm, rate_embed
 )
 
-from config import MainConfig
+from .config import MainConfig
 """
 Models: API endpoints, authentication, model availability (batch availability if batch selected; vision availability for VLM if vlm enabled)
 Emails: Email connectivity and authentication

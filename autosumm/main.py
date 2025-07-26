@@ -8,14 +8,14 @@ from datetime import date
 from typing import Optional, List
 from dataclasses import dataclass
 
-from pipeline import (
+from .pipeline import (
     Cacher, fetch,
     parse_fast, parse_vlm,
     rate_embed, rate_llm,
     summarize, render, deliver
 )
 
-from config import MainConfig
+from .config import MainConfig, arxiv_categories
 
 @dataclass
 class PaperMetadata:
@@ -247,9 +247,9 @@ def setup_logging(log_dir: str, send_log: bool, verbose: bool = False):
     )
     return logging.getLogger(__name__), log_file_path
 
-def run_pipeline(config_path, verbose: bool=False):
+def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[str]=None):
     """Main pipeline of ArXiv AutoSumm"""
-    logger, _ = setup_logging(log_dir=".", send_log=False, verbose=verbose)[0]
+    logger, _ = setup_logging(log_dir=".", send_log=False, verbose=verbose)
     log_file_path = None
     config = {}
     
@@ -267,8 +267,16 @@ def run_pipeline(config_path, verbose: bool=False):
 
         # 1. Determine category to fetch
         today = date.today()
-        categories = config["categories"]
-        category = categories[int(today.strftime('%j')) % len(categories)]
+        if specified_category is not None:
+            if specified_category in arxiv_categories:
+                category = specified_category
+            else:
+                logger.warning(f"Specified category {specified_category} invalid, fallback to default date-based category")
+                categories = config["categories"]
+                category = categories[int(today.strftime('%j')) % len(categories)]
+        else:
+            categories = config["categories"]
+            category = categories[int(today.strftime('%j')) % len(categories)]
         logger.info(f"Processing category: {category} for date {today}")
         
         print('-'*50)

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autosumm"
+version = "0.1.0"
+description = "A pipeline for fetching and summarizing academic papers."
+authors = [
+  { name="Mtrya", email="kaupane20@yeah.net" },
+]
+requires-python = ">=3.8"
+readme = "README.md"
+license = "MIT"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "arxiv>=2.2.0",
+    "arxiv2text>=0.1.14",
+    "json_repair>=0.47.1",
+    "openai>=1.90.0",
+    "pandas>=2.3.0",
+    "pydantic>=2.11.7",
+    "PyMuPDF>=1.26.1",
+    "PyPDF2>=3.0.1",
+    "PyYAML>=6.0.2",
+    "regex>=2024.11.6",
+    "requests>=2.32.4",
+    "scikit-learn>=1.7.0",
+    "tiktoken>=0.9.0",
+    "tqdm>=4.67.1",
+    "python-dotenv>=0.9.9"
+]
+
+[project.scripts]
+autosumm = "autosumm.cli:app"
+
+[tool.setuptools]
+packages = ["autosumm"]
+
+[project.urls]
+Homepage = "https://github.com/Mtrya/arxiv-autosumm"
+Issues = "https://github.com/Mtrya/arxiv-autosumm/issues"
