@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any, Union, List
 import yaml
 from datetime import datetime
 from pathlib import Path
+from dotenv import load_dotenv
 import os
 import re
 
@@ -116,24 +117,10 @@ def validate_api_config(provider: Optional[str], base_url: Optional[str], api_ke
     
     return provider, base_url, api_key
 
-class RuntimeConfig(BaseModel):
-    texlive_root: Optional[str]=None
-    docker_mount_cache: str = "~/.cache/arxiv-autosumm"
-    docker_mount_output: str = "~/arxiv_summaries"
-
 class RunConfig(BaseModel):
-    schedule: str
-    autostart: bool=True
     categories: List[str]
     send_log: bool=False
-
-    @field_validator('schedule')
-    @classmethod
-    def validate_cron_schedule(cls, v) -> str:
-        parts = v.split()
-        if len(parts) != 5:
-            raise ValueError("Schedule must be in cron format (5 fields)")
-        return v
+    log_dir: str="./logs"
     
     @field_validator('categories')
     @classmethod
@@ -637,7 +624,6 @@ class DelivererConfig(BaseModel):
 class MainConfig(BaseModel):
     model_config = ConfigDict(extra='forbid') # prevent unknown fields
 
-    runtime: RuntimeConfig
     run: RunConfig
     fetch: FetcherConfig
     summarize: SummarizerConfig
@@ -673,6 +659,7 @@ class MainConfig(BaseModel):
     @staticmethod
     def _resolve_references(data: Dict[str,Any]) -> Dict[str, Any]:
         """Recursively resolve 'file:path' and 'env:variable' references"""
+        load_dotenv()
         if isinstance(data, dict):
             result = {}
             for key, value in data.items():
@@ -701,6 +688,8 @@ class MainConfig(BaseModel):
         """Convert all configs to pipeline dataclasses"""
         return {
             "categories": self.run.categories,
+            "send_log": self.run.send_log,
+            "log_dir": self.run.log_dir,
             "fetch": self.fetch.to_pipeline_config(),
             "parse": self.parse.to_pipeline_config(),
             "rate": self.rate.to_pipeline_config(),

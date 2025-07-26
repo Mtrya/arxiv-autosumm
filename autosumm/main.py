@@ -2,6 +2,7 @@
 Complete ArXiv-AutoSumm summarization workflow
 """
 
+import os
 import logging
 from datetime import date
 from typing import Optional, List
@@ -225,19 +226,32 @@ def summarize_paper(papers: List[PaperMetadata], cacher: Cacher, summarize_confi
 
 
 
-def setup_logging(verbose: bool = False):
+def setup_logging(log_dir: str, send_log: bool, verbose: bool = False):
     """Set up logging with appropriate verbosity level"""
     level = logging.DEBUG if verbose else logging.INFO
+    handlers = [logging.StreamHandler()]
+    log_file_path = None
+
+    if send_log:
+        os.makedirs(log_dir, exist_ok=True)
+        log_file_path = os.path.join(log_dir, f"pipeline-run-{date.today()}.log")
+        file_handler = logging.FileHandler(log_file_path)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        handlers.append(file_handler)
+
     logging.basicConfig(
         level=level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[logging.StreamHandler()]
+        handlers=handlers,
+        force=True
     )
-    return logging.getLogger(__name__)
+    return logging.getLogger(__name__), log_file_path
 
 def run_pipeline(config_path, verbose: bool=False):
     """Main pipeline of ArXiv AutoSumm"""
-    logger = setup_logging(verbose)
+    logger, _ = setup_logging(log_dir=".", send_log=False, verbose=verbose)[0]
+    log_file_path = None
+    config = {}
     
     try:
         # 0. Load and check configuration change
@@ -245,6 +259,10 @@ def run_pipeline(config_path, verbose: bool=False):
         config = MainConfig.from_yaml(config_path).get_pipeline_configs()
         cacher = Cacher(config["cache"])
         cacher.detect_and_handle_config_changes(config["rate"])
+        logger, log_file_path = setup_logging(
+            log_dir=config.get("log_dir","./logs"),
+            send_log=config.get("send_log",False)
+        )
         logger.info("Configuration loaded successfully")
 
         # 1. Determine category to fetch
@@ -321,15 +339,23 @@ def run_pipeline(config_path, verbose: bool=False):
         # 15. Deliver
         logger.info("Delivering results...")
         paths = [r.path for r in render_result]
-        deliver(paths, config["deliver"], "arxiv_summary_test")
+        if log_file_path:
+            paths.append(log_file_path)
+        deliver(paths, config["deliver"], f"ArXiv Summary for {category}")
         logger.info("Pipeline completed successfully")
         
     except Exception as e:
-        logger.error(f"Pipeline failed with error: {e}", exc_info=verbose)
+        logger.error(f"Pipeline failed with error: {e}", exc_info=True) # always log exc_info when something went wrong
+        if log_file_path and config.get("send_log"):
+            try:
+                logger.info(f"Attempting to deliver error log: {log_file_path}")
+                deliver([log_file_path],config["deliver"],"[ERROR] in ArXiv Summary Pipeline")
+            except Exception as deliver_e:
+                logger.error(f"Failed to deliver error log: {deliver_e}", exc_info=verbose)
         raise
 
 
 
 if __name__ == "__main__":
-    config_path = "my_own_config.yaml"
+    config_path = "config.yaml"
     run_pipeline(config_path)

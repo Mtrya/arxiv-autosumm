@@ -88,6 +88,11 @@ def test_config(
         "--config",
         "-c",
         help="Path to configuration file to test"
+    ),
+    skip_api_checks: bool = typer.Option(
+        False,
+        "--skip-api-checks",
+        help="Skip validation of API connectivity (LLMs, Embedders, VLMs, etc.)."
     )
 ):
     """
@@ -150,36 +155,37 @@ def test_config(
             )
         _print_validation_result(results["email"])
 
-        # 4. Summarizer configuration
-        #typer.echo("Validating summarizer API connectivity and model availability...")
-        results["summarize"] = validator._validate_summarizer()
-        _print_validation_result(results["summarize"])
+        if not skip_api_checks:
+            # 4. Summarizer configuration
+            #typer.echo("Validating summarizer API connectivity and model availability...")
+            results["summarize"] = validator._validate_summarizer()
+            _print_validation_result(results["summarize"])
 
-        # 5. Rater configuration
-        if config["rate"].strategy == "hybrid":
-            #typer.echo("Validating LLM rater API connectivity and model availability...")
-            results["rate_llm"] = validator._validate_raterllm()
-            _print_validation_result(results["rate_llm"])
-            
-            #typer.echo("Validating embedder API connectivity and model availability...")
-            results["rate_embed"] = validator._validate_embedder()
-            _print_validation_result(results["rate_embed"])
-            
-        elif config["rate"].strategy == "embedder":
-            #typer.echo("Validating embedder API connectivity and model availability...")
-            results["rate_embed"] = validator._validate_embedder()
-            _print_validation_result(results["rate_embed"])
-            
-        elif config["rate"].strategy == "llm":
-            #typer.echo("Validating LLM rater API connectivity and model availability...")
-            results["rate_llm"] = validator._validate_raterllm()
-            _print_validation_result(results["rate_llm"])
+            # 5. Rater configuration
+            if config["rate"].strategy == "hybrid":
+                #typer.echo("Validating LLM rater API connectivity and model availability...")
+                results["rate_llm"] = validator._validate_raterllm()
+                _print_validation_result(results["rate_llm"])
+                
+                #typer.echo("Validating embedder API connectivity and model availability...")
+                results["rate_embed"] = validator._validate_embedder()
+                _print_validation_result(results["rate_embed"])
+                
+            elif config["rate"].strategy == "embedder":
+                #typer.echo("Validating embedder API connectivity and model availability...")
+                results["rate_embed"] = validator._validate_embedder()
+                _print_validation_result(results["rate_embed"])
+                
+            elif config["rate"].strategy == "llm":
+                #typer.echo("Validating LLM rater API connectivity and model availability...")
+                results["rate_llm"] = validator._validate_raterllm()
+                _print_validation_result(results["rate_llm"])
 
-        # 6. Parser configuration
-        if config["parse"].enable_vlm:
-            #typer.echo("Validating VLM parser API connectivity and model availability...")
-            results["parse_vlm"] = validator._validate_parservlm()
-            _print_validation_result(results["parse_vlm"])
+            # 6. Parser configuration
+            if config["parse"].enable_vlm:
+                #typer.echo("Validating VLM parser API connectivity and model availability...")
+                results["parse_vlm"] = validator._validate_parservlm()
+                _print_validation_result(results["parse_vlm"])
 
         # Summary
         total_checks = len(results)

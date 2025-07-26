@@ -40,7 +40,7 @@ class SummarizerClient(BaseClient):
             prompt_tokens += count_tokens(config.user_prompt_template)
         safety_margin = 128
         output_tokens = config.completion_options.get('max_tokens', 8192)
-        base_context = config.context_length or 65536
+        base_context = config.context_length or 131072
         self.available_context = base_context - prompt_tokens - output_tokens - safety_margin
     
     def _build_payload(self, parsed_content: str) -> dict:

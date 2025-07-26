@@ -243,7 +243,7 @@ class RaterLLMClient(BaseClient):
                 final_score = 0.0
                 
         except Exception as e:
-            print(f"error parsing response {response}: {e}")
+            #print(f"error parsing response {response}: {e}")
             return 0.0
         
         return final_score

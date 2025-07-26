@@ -14,6 +14,7 @@ import getpass
 
 from config import MainConfig, arxiv_categories, recognized_providers, validate_api_config
 
+# TODO: remove host-level setup (mount point, autostart and schedule), focus on summary configs only
 
 def get_interactive_input(prompt: str, default: Optional[str] = None, 
                          validation_func=None, password: bool = False) -> str:
@@ -42,14 +43,6 @@ def validate_email(email: str) -> None:
     """Validate email address format."""
     if '@' not in email or not re.match(r"[^@]+@[^@]+\.[a-zA-Z]{2,}$", email):
         raise ValueError("Invalid email format")
-
-
-def validate_cron(schedule: str) -> None:
-    """Validate cron schedule format."""
-    parts = schedule.split()
-    if len(parts) != 5:
-        raise ValueError("Schedule must be in 5-field cron format (min hour day month weekday)")
-
 
 def select_categories_interactively() -> List[str]:
     """Interactive category selection."""
@@ -110,7 +103,7 @@ def configure_llm_providers() -> Dict[str, any]:
     
     # Provider selection
     providers = list(recognized_providers.keys())
-    typer.echo("Recognized providers:")
+    typer.echo("Default providers:")
     for i, provider in enumerate(providers, 1):
         typer.echo(f"{i}. {provider}")
     
@@ -137,7 +130,7 @@ def configure_llm_providers() -> Dict[str, any]:
     typer.echo("\n📊 Configure Rater LLM (for initial paper filtering)")
     typer.echo("This can be a cheaper/faster model to reduce costs when processing many papers.")
     
-    use_separate_rater = typer.confirm("Use a separate model for rating?", default=False)
+    use_separate_rater = typer.confirm("Use a separate model for rating?", default=True)
     
     rater_provider = provider
     rater_base_url = base_url
@@ -210,7 +203,8 @@ def get_default_model(provider: str) -> str:
         "dashscope": "qwen-plus",
         "ollama": "qwen3:32b",
         "moonshot": "kimi-k2-0711-preview",
-        "minimax": "MiniMax-M1"
+        "minimax": "MiniMax-M1",
+        "modelscope": "Qwen/Qwen3-235B-A22B-Thinking-2507"
     }
     return defaults.get(provider, "deepseek-reasoner")
 
@@ -224,34 +218,19 @@ def get_cheaper_model(provider: str) -> str:
         "dashscope": "qwen-turbo",
         "ollama": "llama3.1:8b",
         "moonshot": "kimi-latest",
-        "minimax": "MiniMax-Text-01"
+        "minimax": "MiniMax-Text-01",
+        "modelscope": "Qwen/Qwen2.5-7B-Instruct"
     }
     return cheaper_defaults.get(provider, "deepseek-chat")
 
 
-def configure_schedule() -> Dict[str, any]:
-    """Configure schedule and categories."""
-    typer.echo("\n⏰ Configure Schedule")
-    typer.echo("=" * 40)
-    
-    typer.echo("Schedule format: cron (5 fields)")
-    typer.echo("Examples:")
-    typer.echo("  Daily 9 AM: 0 9 * * *")
-    typer.echo("  Daily 6 PM: 0 18 * * *")
-    typer.echo("  Every Monday 9 AM: 0 9 * * 1")
-    
-    schedule = get_interactive_input("Schedule", default="0 9 * * *", 
-                                   validation_func=validate_cron)
-    
+def configure_categories() -> Dict[str, any]:
+    """Configure categories and log sent."""
     categories = select_categories_interactively()
     typer.echo(f"Selected categories: {', '.join(categories)}")
     
-    autostart = typer.confirm("Automatically start on system boot?", default=True)
-    
     return {
-        "schedule": schedule,
-        "categories": categories,
-        "autostart": autostart
+        "categories": categories, 
     }
 
 
@@ -291,7 +270,7 @@ def configure_email() -> Dict[str, any]:
     
     # Basic validation only - no connectivity test
     typer.echo("ℹ️  Basic email configuration accepted")
-    typer.echo("   Run 'python autosumm/cli.py test_config' to test API and email connectivity")
+    typer.echo("   Run 'python autosumm/cli.py test-config' to test API and email connectivity")
     
     return {
         "smtp_server": smtp_server,
@@ -315,22 +294,17 @@ def create_config_from_wizard() -> MainConfig:
     llm_config = configure_llm_providers()
     
     # Step 2: Schedule and Categories
-    schedule_config = configure_schedule()
+    category_config = configure_categories()
     
     # Step 3: Email Configuration
     email_config = configure_email()
     
     # Create configuration with sensible defaults
     config_data = {
-        "runtime": {
-            "docker_mount_cache": "~/.cache/arxiv-autosumm",
-            "docker_mount_output": "~/arxiv_summaries"
-        },
         "run": {
-            "schedule": schedule_config["schedule"],
-            "autostart": schedule_config["autostart"],
-            "categories": schedule_config["categories"],
-            "send_log": False
+            "categories": category_config["categories"],
+            "send_log": False,
+            "log_dir": "./logs"
         },
         "fetch": {
             "days": 8,
@@ -347,8 +321,8 @@ def create_config_from_wizard() -> MainConfig:
         },
         "rate": {
             "strategy": "llm",
-            "top_k": 1000, # arbitrary for llm rating
-            "max_selected": 8,
+            "top_k": 200, # arbitrary for llm rating
+            "max_selected": 10,
             "embedder": None,  # Skip embedder for simplicity - use LLM only
             "llm": {
                 "provider": llm_config["rater_provider"],

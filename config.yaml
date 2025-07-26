@@ -1,45 +1,35 @@
-runtime:
-  docker_mount_cache: ~/.cache/arxiv-autosumm
-  docker_mount_output: ~/arxiv_summaries
 run:
-  schedule: 0 9 * * *
-  autostart: true
   categories:
   - cs.AI
-  - cs.LG
-  - cs.CL
   - cs.CV
   - cs.RO
-  - math.ST
-  - stat.ML
-  - q-bio.QM
-  - physics.comp-ph
   send_log: false
+  log_dir: ./logs
 fetch:
   days: 8
   max_results: 1000
   max_retries: 10
 summarize:
-  provider: volcengine
-  api_key: env:DEEPSEEK_API_KEY # use 'env:' pattern to safely store your API keys
-  base_url: https://api.deepseek.com/v1
-  model: deepseek-reasoner
+  provider: modelscope
+  api_key: env:MODELSCOPE_API_KEY
+  base_url: https://api-inference.modelscope.cn/v1/
+  model: Qwen/Qwen3-235B-A22B-Thinking-2507
   batch: false
-  system_prompt: file:prompts/summ_lm/system.md # use 'file:' pattern for cleaner config.yaml
-  user_prompt_template: 'Summarize this research paper: {paper_content}' # '{paper_content}' placeholder required
+  user_prompt_template: 'Summarize this research paper: {paper_content}'
   completion_options:
     temperature: 0.6
   context_length: 98304
 rate:
-  top_k: 1000
-  max_selected: 8
+  strategy: llm
+  top_k: 200
+  max_selected: 10
   llm:
     provider: siliconflow
     api_key: env:SILICONFLOW_API_KEY
     base_url: https://api.siliconflow.cn/v1
     model: THUDM/glm-4-9b-chat
     batch: false
-    user_prompt_template: 'Rate this paper based on: {paper_text} with criteria: {criteria_text}' # '{paper_text}' and '{criteria_text}' placeholder required
+    user_prompt_template: 'Rate this paper based on: {paper_text} with criteria: {criteria_text}'
     completion_options:
       temperature: 0.2
       max_tokens: 1024
@@ -89,11 +79,13 @@ render:
     self_contained: false
     highlight_style: pygments
     html5: true
-  azw3: {}
+  azw3:
+    author: ArXiv AutoSumm
+    language: en
 deliver:
   smtp_server: smtp.163.com
   sender: arxiv_bot@163.com
-  recipient: email@uni.edu
+  recipient: kaupane20@yeah.net
   password: env:SMTP_PASSWORD
   port: 465
   max_attachment_size_mb: 25.0
