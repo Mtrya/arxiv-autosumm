@@ -7,12 +7,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import subprocess
 import re
+import logging
 from datetime import datetime
 
 try:
     from client import BaseClient, BatchConfig
 except:
     from .client import BaseClient, BatchConfig
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class MarkdownRendererConfig:
@@ -608,8 +611,10 @@ def render_azw3(summaries: List[str], category, config: RendererConfig) -> Rende
 def render(summaries: List[str], category: str, config: RendererConfig) -> List[RenderResult]:
     """Main entry point - delegates to format-specific renderers"""
     results = []
+    logger.info(f"Starting rendering for {len(summaries)} summaries in formats: {config.formats}")
 
     if not summaries:
+        logger.warning("No summaries provided for rendering")
         error_result = RenderResult(
             path="",
             format="all",
@@ -624,6 +629,7 @@ def render(summaries: List[str], category: str, config: RendererConfig) -> List[
         reordered_formats.append("md")
 
     for format_name in reordered_formats:
+        logger.debug(f"Rendering format: {format_name}")
         if format_name == "md":
             result = render_md(summaries, category, config)
         elif format_name == "pdf":
@@ -633,6 +639,7 @@ def render(summaries: List[str], category: str, config: RendererConfig) -> List[
         elif format_name == "azw3":
             result = render_azw3(summaries, category, config)
         else:
+            logger.error(f"Unsupported format requested: {format_name}")
             result = RenderResult(
                 path="",
                 format=format_name,
@@ -640,6 +647,9 @@ def render(summaries: List[str], category: str, config: RendererConfig) -> List[
                 error=f"Unsupported format: {format_name}"
             )
         results.append(result)
+    
+    successful = sum(1 for r in results if r.success)
+    logger.info(f"Rendering completed: {successful}/{len(results)} formats successful")
     
     return results
 

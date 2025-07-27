@@ -10,11 +10,14 @@ from typing import List, Optional, Dict, Union, Tuple, Any
 from pathlib import Path
 import time
 from json_repair import repair_json
+import logging
 
 try:
     from client import BaseClient, BatchConfig, count_tokens, truncate_to_tokens
 except:
     from .client import BaseClient, BatchConfig, count_tokens, truncate_to_tokens
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class RaterEmbedderConfig:
@@ -271,6 +274,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
     embedder_client = RaterEmbedderClient(config.embedder, batch_config)
     results = []
     
+    logger.info(f"Starting embedding-based rating for {len(parsed_contents)} papers")
     for content in parsed_contents:
         try:
             # Handle text chunking here
@@ -279,6 +283,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
             if token_count <= embedder_client.context_length:
                 # Text fits, get similarity directly
                 similarity_score = embedder_client.process_single(content)
+                logger.debug(f"Processed paper with {token_count} tokens")
             else:
                 # Text too long, chunk and get weighted average
                 chunks = chunk_text(content, embedder_client.context_length)
@@ -296,6 +301,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
                     weighted_similarity = 0.0
                 
                 similarity_score = weighted_similarity
+                logger.debug(f"Processed chunked paper with {len(chunks)} chunks")
             
             results.append(RateResult(
                 score=similarity_score or 0.0,
@@ -305,21 +311,24 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
             ))
             
         except Exception as e:
+            logger.error(f"Embedding rating failed: {e}")
             results.append(RateResult(
                 score=0.0,
                 success=False,
                 error=str(e),
                 method="embed"
             ))
+    logger.info(f"Embedding rating completed: {len([r for r in results if r.success])} successful, {len([r for r in results if not r.success])} failed")
     
     return results
 
 def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Optional[BatchConfig]=None) -> List[RateResult]:
     """Rate multiple papers using batch processing when configured"""
+    logger.info(f"Starting LLM-based rating for {len(parsed_contents)} papers (batch={getattr(config, 'batch', False)})")
     if not getattr(config, 'batch', False):
         client = RaterLLMClient(config.llm,batch_config)
         results = [client.process_single(content) for content in parsed_contents]
-        return [
+        final_results = [
             RateResult(
                 score=result or 0.0,
                 success=result is not None,
@@ -327,12 +336,14 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
                 method="llm_single"
             ) for result in results
         ]
+        logger.info(f"Single LLM rating completed: {len([r for r in final_results if r.success])} successful")
+        return final_results
 
     try:
         client = RaterLLMClient(config.llm, batch_config)
         results = client.process_batch(parsed_contents)
 
-        return [
+        final_results = [
             RateResult(
                 score=result or 0.0,
                 success=result is not None,
@@ -340,8 +351,11 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
                 method="llm_batch"
             ) for result in results
         ]
+        logger.info(f"Batch LLM rating completed: {len([r for r in final_results if r.success])} successful")
+        return final_results
 
     except Exception as e:
+        logger.error(f"LLM rating failed: {e}")
         return [
             RateResult(
                 score=0.0,

@@ -5,11 +5,14 @@ Summarize parsed papers using LLM
 from dataclasses import dataclass
 import time
 from typing import Optional, Dict, Any, List
+import logging
 
 try:
     from client import BaseClient, BatchConfig, count_tokens, truncate_to_tokens
 except:
     from .client import BaseClient, BatchConfig, count_tokens, truncate_to_tokens
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class SummarizerConfig:
@@ -94,31 +97,37 @@ class SummarizerClient(BaseClient):
 
 def summarize(parsed_contents: List[str], config: SummarizerConfig, batch_config: Optional[BatchConfig] = None) -> List[SummaryResult]:
     """Summarize multiple papers using batch processing when possible."""
+    logger.info(f"Starting summarization for {len(parsed_contents)} papers (batch={getattr(config, 'batch', False)})")
     if not getattr(config, 'batch', False):
         # If batch is disabled, process sequentially
         client = SummarizerClient(config, batch_config)
         results = [client.process_single(content, sleep_time=60) for content in parsed_contents]
-        return [
+        final_results = [
             SummaryResult(
                 content=result or "",
                 success=result is not None,
                 error=None if result is not None else "Single processing failed for this item"
             ) for result in results
         ]
+        logger.info(f"Single summarization completed: {len([r for r in final_results if r.success])} successful")
+        return final_results
     
     try:
         client = SummarizerClient(config, batch_config)
         results = client.process_batch(parsed_contents)
         
-        return [
+        final_results = [
             SummaryResult(
                 content=result or "",
                 success=result is not None,
                 error=None if result is not None else "Batch processing failed for this item",
             ) for result in results
         ]
+        logger.info(f"Batch summarization completed: {len([r for r in final_results if r.success])} successful")
+        return final_results
         
     except Exception as e:
+        logger.error(f"Summarization failed: {e}")
         return [
             SummaryResult(
                 content="",

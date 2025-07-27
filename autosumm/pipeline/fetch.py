@@ -7,8 +7,11 @@ from dataclasses import dataclass
 from typing import List, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
+import logging
 import arxiv
 import time
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class FetcherConfig:
@@ -41,6 +44,7 @@ def fetch(category: str, config: FetcherConfig) -> List[FetchResult]:
     date_query = f'submittedDate:[{start_date_str} TO {end_date_str}]'
     full_query = f'{category} AND {date_query}'
 
+    logger.info(f"Fetching papers for category: {category}, days: {config.days}, max: {config.max_results}")
     search = arxiv.Search(
         query=full_query,
         max_results=config.max_results,
@@ -63,12 +67,13 @@ def fetch(category: str, config: FetcherConfig) -> List[FetchResult]:
                     citation=result.journal_ref if result.journal_ref else result.entry_id,
                     submitted_date=result.published
                 ))
+            logger.info(f"Fetched {len(papers)} papers successfully")
             break
         except arxiv.UnexpectedEmptyPageError as e:
-            print(f"Attempt {attempt+1} failed: {e}")
+            logger.warning(f"Attempt {attempt+1} failed: {e}")
             time.sleep(5)
     else:
-        print("Max retries reached. Failed to fetch papers.")
+        logger.error("Max retries reached. Failed to fetch papers.")
         raise RuntimeError("Failed to fetch papers after maximum retries.")
     
     return papers

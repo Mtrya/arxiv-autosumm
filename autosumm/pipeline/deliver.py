@@ -12,6 +12,9 @@ from email import encoders
 from pathlib import Path
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class DeliveryResult:
@@ -114,6 +117,7 @@ def deliver(file_paths: List[str], config: DelivererConfig, subject: Optional[st
     log_files = []
 
     max_size_bytes = int(config.max_attachment_size_mb*1024*1024)
+    logger.info(f"Starting delivery to {config.recipient} with max size {config.max_attachment_size_mb}MB")
 
     attachments_data = []
     total_attachment_size = 0.0
@@ -131,12 +135,14 @@ def deliver(file_paths: List[str], config: DelivererConfig, subject: Optional[st
             total_attachment_size += info["size_bytes"]
         elif status == "too_large":
             files_too_large.append(file_path)
+            logger.warning(f"File too large: {Path(file_path).name}")
         elif status == "log_file":
             log_files.append(file_path)
             attachments_data.append((file_path, info["size_bytes"]))
             total_attachment_size += info["size_bytes"]
         else:
             files_skipped.append(file_path)
+            logger.info(f"Skipping file: {Path(file_path).name}")
 
     msg = MIMEMultipart()
     msg['From'] = config.sender
@@ -162,6 +168,7 @@ def deliver(file_paths: List[str], config: DelivererConfig, subject: Optional[st
                     filename=Path(file_path).name
                 )
                 msg.attach(attachment)
+                logger.debug(f"Attached file: {Path(file_path).name}")
         except Exception as e:
             # if can't read a file that was supposed to be good, move it to skipped and continue
             if file_path in files_sent:
@@ -186,6 +193,7 @@ def deliver(file_paths: List[str], config: DelivererConfig, subject: Optional[st
             server.login(config.sender, config.password)
             server.sendmail(config.sender, config.recipient, msg.as_string())
             
+        logger.info(f"Email sent to {config.recipient} successfully ({email_size_mb:.2f}MB)")
         print(f"Email sent to {config.recipient} successfully")
         print(f"Total email size: {email_size_mb:.2f}MB")
         print(f"Files attached: {len(files_sent + error_files)}")
@@ -201,6 +209,7 @@ def deliver(file_paths: List[str], config: DelivererConfig, subject: Optional[st
         
     except Exception as e:
         error_msg = f"Failed to send email: {str(e)}"
+        logger.error(error_msg)
         print(f"Error: {error_msg}")
         
         return DeliveryResult(

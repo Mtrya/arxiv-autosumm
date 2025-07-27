@@ -8,10 +8,13 @@ import sqlite3
 import json
 import hashlib
 import time
+import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict, is_dataclass
 from typing import Optional, Tuple, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class CacherConfig:
@@ -27,6 +30,9 @@ class Cacher:
         # Database path only - no summary files directory
         self.db_path = self.cache_dir / "cache.db"
         
+        logger.info(f"Initializing cache at {self.db_path}")
+        logger.info(f"Cache TTL: {config.ttl_days} days")
+        
         # Initialize database
         self._init_database()
     
@@ -34,6 +40,8 @@ class Cacher:
         """Initialize SQLite database with required tables."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
+        
+        logger.debug("Creating database tables...")
         
         # Similarity scores from embedder
         cursor.execute('''
@@ -73,6 +81,7 @@ class Cacher:
         
         conn.commit()
         conn.close()
+        logger.info("Database tables initialized successfully")
     
     def _to_serializable(self, obj: Any) -> Any:
         """Recursively converts objects to JSON-serializable types. Handles dataclasses/Pydantic models, dictionaries and lists"""
@@ -108,7 +117,12 @@ class Cacher:
         result = cursor.fetchone()
         conn.close()
         
-        return result[0] if result else None
+        if result:
+            logger.debug(f"Cache hit: similarity score for {arxiv_id} = {result[0]}")
+            return result[0]
+        else:
+            logger.debug(f"Cache miss: no similarity score for {arxiv_id}")
+            return None
     
     def store_similarity_score(self, arxiv_id: str, score: float):
         """Store similarity score for paper."""
@@ -122,6 +136,7 @@ class Cacher:
         
         conn.commit()
         conn.close()
+        logger.debug(f"Stored similarity score for {arxiv_id}: {score}")
     
     # Rating scores (from LLM rater)
     def get_rating_score(self, arxiv_id: str) -> Optional[Tuple[float, Dict]]:
@@ -139,8 +154,11 @@ class Cacher:
         if result:
             score, details_json = result
             details = json.loads(details_json)
+            logger.debug(f"Cache hit: rating score for {arxiv_id} = {score}")
             return score, details
-        return None
+        else:
+            logger.debug(f"Cache miss: no rating score for {arxiv_id}")
+            return None
     
     def store_rating_score(self, arxiv_id: str, score: float, details: Dict):
         """Store rating score and details for paper."""
@@ -155,6 +173,7 @@ class Cacher:
         
         conn.commit()
         conn.close()
+        logger.debug(f"Stored rating score for {arxiv_id}: {score}")
     
     # Processed papers tracking
     def is_paper_processed(self, arxiv_id: str) -> bool:
@@ -169,7 +188,9 @@ class Cacher:
         result = cursor.fetchone()
         conn.close()
         
-        return result is not None
+        processed = result is not None
+        logger.debug(f"Paper {arxiv_id} processed status: {processed}")
+        return processed
     
     def mark_paper_processed(self, arxiv_id: str, metadata: Dict):
         """Mark paper as processed (delivered)."""
@@ -184,6 +205,7 @@ class Cacher:
         
         conn.commit()
         conn.close()
+        logger.info(f"Marked paper {arxiv_id} as processed")
     
     # Config change detection & cache clearing
     def detect_and_handle_config_changes(self, current_config: Dict[str, Any]):
@@ -200,12 +222,12 @@ class Cacher:
         last_hash = result[0] if result else None
         
         if last_hash != current_hash:
-            print(f"Configuration changed. Previous: {last_hash}, Current: {current_hash}")
+            logger.info(f"Configuration changed. Previous: {last_hash}, Current: {current_hash}")
             
             if last_hash is None:
-                print("First run - no cache clearing needed")
+                logger.info("First run - no cache clearing needed")
             else:
-                print("Configuration changed - clearing all caches except processed papers")
+                logger.info("Configuration changed - clearing all caches except processed papers")
                 self.clear_all_cache(preserve_processed_papers=True)
             
             cursor.execute(
@@ -213,6 +235,8 @@ class Cacher:
                 (current_hash,)
             )
             conn.commit()
+        else:
+            logger.debug("Configuration unchanged - no cache clearing needed")
         
         conn.close()
     
@@ -221,21 +245,24 @@ class Cacher:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('DELETE FROM similarity_scores')
+        deleted = cursor.rowcount
         conn.commit()
         conn.close()
-        print("Cleared embedder cache (similarity scores)")
+        logger.info(f"Cleared embedder cache (similarity scores) - deleted {deleted} entries")
     
     def clear_rater_cache(self):
         """Clear cached rating scores."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('DELETE FROM rating_scores')
+        deleted = cursor.rowcount
         conn.commit()
         conn.close()
-        print("Cleared rater cache (rating scores)")
+        logger.info(f"Cleared rater cache (rating scores) - deleted {deleted} entries")
     
     def clear_all_cache(self, preserve_processed_papers: bool = True):
         """Clear all caches, optionally preserving processed papers tracking."""
+        logger.info("Clearing all caches...")
         self.clear_embedder_cache()
         self.clear_rater_cache()
         
@@ -243,9 +270,10 @@ class Cacher:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             cursor.execute('DELETE FROM processed_papers')
+            deleted = cursor.rowcount
             conn.commit()
             conn.close()
-            print("Cleared processed papers tracking")
+            logger.info(f"Cleared processed papers tracking - deleted {deleted} entries")
     
     # Maintenance
     def cleanup_expired(self):
@@ -264,13 +292,15 @@ class Cacher:
             deleted = cursor.rowcount
             total_deleted += deleted
             if deleted > 0:
-                print(f"Deleted {deleted} expired records from {table}")
+                logger.info(f"Deleted {deleted} expired records from {table}")
         
         conn.commit()
         conn.close()
         
         if total_deleted == 0:
-            print("No expired cache entries found")
+            logger.debug("No expired cache entries found")
+        else:
+            logger.info(f"Total expired entries cleaned: {total_deleted}")
         
         return total_deleted
     

@@ -245,6 +245,11 @@ def setup_logging(log_dir: str, send_log: bool, verbose: bool = False):
         handlers=handlers,
         force=True
     )
+
+    # Suppress INFO/WARNING logs from noisy libraries
+    logging.getLogger('arxiv').setLevel(logging.ERROR)
+    logging.getLogger('pdfminer').setLevel(logging.ERROR)
+    
     return logging.getLogger(__name__), log_file_path
 
 def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[str]=None):

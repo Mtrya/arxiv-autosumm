@@ -11,11 +11,14 @@ from pathlib import Path
 import fitz
 import base64
 from arxiv2text import arxiv_to_md
+import logging
 
 try:
     from client import BaseClient, BatchConfig
 except:
     from .client import BaseClient, BatchConfig
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class ParserVLMConfig:
@@ -56,6 +59,7 @@ def _pdf_to_images(pdf_url: str, pdf_index: int, config: ParserVLMConfig, tmp_di
     try:
         # Download PDF if URL
         if pdf_url.startswith(('http://', 'https://')):
+            logger.debug(f"Downloading PDF from URL: {pdf_url}")
             response = requests.get(pdf_url)
             response.raise_for_status()
             
@@ -63,6 +67,7 @@ def _pdf_to_images(pdf_url: str, pdf_index: int, config: ParserVLMConfig, tmp_di
             pdf_path.parent.mkdir(parents=True, exist_ok=True)
             with open(pdf_path, 'wb') as f:
                 f.write(response.content)
+            logger.debug(f"Downloaded PDF to: {pdf_path}")
         else:
             pdf_path = Path(pdf_url)
         
@@ -90,7 +95,7 @@ def _pdf_to_images(pdf_url: str, pdf_index: int, config: ParserVLMConfig, tmp_di
             pdf_path.unlink(missing_ok=True)
             
     except Exception as e:
-        print(f"Error converting PDF {pdf_index} to images: {e}")
+        logger.error(f"Error converting PDF {pdf_index} to images: {e}")
         return []
     
     return image_data_list
@@ -205,11 +210,14 @@ def parse_vlm(pdf_urls: List[str], config: ParserConfig, batch_config: Optional[
     pdf_image_counts = []
     
     for pdf_index, pdf_url in enumerate(pdf_urls):
+        logger.info(f"Processing PDF {pdf_index+1}/{len(pdf_urls)}: {pdf_url}")
         image_data_list = _pdf_to_images(pdf_url,pdf_index,config.vlm,batch_config.tmp_dir)
         all_image_data.extend(image_data_list)
         pdf_image_counts.append(len(image_data_list))
+        logger.debug(f"Extracted {len(image_data_list)} pages from PDF {pdf_index+1}")
     
     if not all_image_data:
+        logger.warning("No images extracted from any PDF")
         return [
             ParseResult(
                 content="",
@@ -220,6 +228,7 @@ def parse_vlm(pdf_urls: List[str], config: ParserConfig, batch_config: Optional[
         ]
 
     vlm_client = ParserVLMClient(config.vlm, batch_config)
+    logger.info(f"Processing {len(all_image_data)} images with VLM (batch={config.vlm.batch})")
 
     if config.vlm.batch:
         vlm_results = vlm_client.process_batch(all_image_data)
@@ -229,6 +238,7 @@ def parse_vlm(pdf_urls: List[str], config: ParserConfig, batch_config: Optional[
     results = _reconstruct_results(vlm_results, pdf_image_counts)
 
     _cleanup_images(all_image_data)
+    logger.info(f"VLM parsing completed: {len([r for r in results if r.success])} successful, {len([r for r in results if not r.success])} failed")
 
     return results
 
@@ -236,9 +246,12 @@ def parse_fast(pdf_urls: List[str], config: ParserConfig) -> List[ParseResult]:
     """
     Fast parsing using arxiv2text for rating phase.
     """
+    # TODO: use multiprocesing to accelerate pdfminer-based paper parsing
     results = []
-    for pdf_url in pdf_urls:
+    logger.info(f"Starting fast parsing for {len(pdf_urls)} PDFs")
+    for pdf_index, pdf_url in enumerate(pdf_urls):
         try:
+            logger.debug(f"Processing PDF {pdf_index+1}/{len(pdf_urls)}: {pdf_url}")
             # Use arxiv2text to convert PDF to markdown
             arxiv_to_md(pdf_url, config.tmp_dir)
             
@@ -272,14 +285,17 @@ def parse_fast(pdf_urls: List[str], config: ParserConfig) -> List[ParseResult]:
                 success=True,
                 method="fast"
             ))
+            logger.debug(f"Successfully parsed PDF {pdf_index+1}")
         
         except Exception as e:
+            logger.error(f"Failed to parse PDF {pdf_index+1}: {e}")
             results.append(ParseResult(
                 content="",
                 success=False,
                 error=str(e),
                 method="fast"
             ))
+    logger.info(f"Fast parsing completed: {len([r for r in results if r.success])} successful, {len([r for r in results if not r.success])} failed")
         
     return results
     

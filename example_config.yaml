@@ -1,2 +1,104 @@
 # This is the detailed example config if you want to make custom configurations
 # Will add example for advanced configuration
+
+run:
+  categories: ["cs.AI", "cs.CV", "cs.RO", "cs.SY", "astro-ph.EP", "math.OC", "physics.space-ph"]
+  send_log: true
+  log_dir: ./logs
+
+fetch:
+  days: 8
+  max_results: 768
+  max_retries: 10
+
+summarize:
+  provider: siliconflow
+  api_key: env:SILICONFLOW_API_KEY
+  base_url: https://api.siliconflow.cn/v1
+  model: deepseek-ai/DeepSeek-R1
+  batch: true
+  system_prompt: file:./prompts/summ_lm/system.md
+  user_prompt_template: file:./prompts/summ_lm/user.md
+  completion_options:
+    temperature: 0.6
+  context_length: 98304
+
+rate:
+  strategy: hybrid
+  top_k: 200
+  max_selected: 10
+  embedder:
+    provider: siliconflow
+    api_key: env:SILICONFLOW_API_KEY
+    base_url: https://api.siliconflow.cn/v1
+    model: Qwen/Qwen3-Embedding-0.6B
+    batch: false
+    query_template: file:./prompts/rate_emb/query.md
+    user_interests: "AI, machine learning, astronomy and astronautics"
+    context_length: 32768
+  llm:
+    provider: siliconflow
+    api_key: env:SILICONFLOW_API_KEY
+    base_url: https://api.siliconflow.cn/v1
+    model: THUDM/glm-4-9b-chat
+    batch: false
+    system_prompt: "You are an expert research paper evaluator"
+    user_prompt_template: file:prompts/rate_lm/user.md
+    completion_options:
+      temperature: 0.2
+      max_tokens: 1024
+    context_length: 65536
+    criteria:
+      novelty:
+        description: "How original and innovative are the contributions?"
+        weight: 0.3
+      methodology:
+        description: "How rigorous is the experimental design and evaluation?"
+        weight: 0.25
+      clarity:
+        description: "How well-written and understandable is the paper?"
+        weight: 0.2
+      impact:
+        description: "How significant are the potential applications and impact?"
+        weight: 0.15
+      relevance:
+        description: "How well does this paper match the user's research interests of AI, machine learning and astronomy?"
+        weight: 0.1
+  
+parse:
+  enable_vlm: true
+  tmp_dir: ./tmp_dir
+  vlm:
+    provider: modelscope
+    api_key: env:SILICONFLOW_API_KEY
+    base_url: https://api.siliconflow.cn/v1
+    model: Qwen/Qwen2.5-VL-32B-Instruct
+    batch: false
+    system_prompt: file:prompts/parse_vlm/system.md
+    user_prompt: file:prompts/parse_vlm/user.md
+    completion_options:
+      temperature: 0.2
+    dpi: 200
+
+batch:
+  tmp_dir: ./tmp
+  max_wait_hours: 24
+  poll_interval_seconds: 30
+  fallback_on_error: true
+
+cache:
+  dir: ~/.cache/arxiv-autosumm
+  ttl_days: 14
+
+render:
+  formats: ["pdf"]
+  output_dir: ./output
+  base_filename: null
+
+deliver:
+  smtp_server: smtp.163.com
+  port: 465
+  sender: arxiv_bot@163.com
+  recipient: kaupane20@yeah.net
+  password: env:SMTP_PASSWORD
+    
