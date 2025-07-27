@@ -5,7 +5,7 @@ Automated research paper summarization from ArXiv with LLM-powered rating, multi
 ## 🚀 What Works Now
 
 **✅ Complete 15-step pipeline**: fetch → parse → rate → summarize → render → deliver  
-**✅ CLI**: Interactive setup, configuration testing, and summarization pipeline running 
+**✅ CLI**: Interactive setup, configuration testing, and summarization pipeline running
 **✅ Multi-format output**: Markdown, HTML, PDF, AZW3 (Kindle)  
 **✅ Smart caching**: SQLite-based with TTL, config change detection, and rate limiting  
 **✅ VLM-powered parsing**: Vision Language Model OCR for enhanced PDF processing  
@@ -17,6 +17,7 @@ Automated research paper summarization from ArXiv with LLM-powered rating, multi
 ### Method 1: Development Installation
 
 Create and activate an virtual environment (optional but recommended)
+
 ```bash
 # python3 -m venv arxiv-env
 # source arxiv-env/bin/activate
@@ -24,7 +25,9 @@ Create and activate an virtual environment (optional but recommended)
 # conda create -n arxiv-env
 # conda activate arxiv-env
 ```
+
 Then install in the virtual environment
+
 ```bash
 git clone https://github.com/Mtrya/arxiv-autosumm.git
 cd arxiv-autosumm
@@ -33,22 +36,25 @@ pip install -e .
 
 ### Method 2: Using Docker
 
-**Not Implemented, Coming Soon**
-
+#### **Not Implemented, Coming Soon**
 
 ## ⚡ Quick Start
 
 ### 1. Interactive Setup (Recommended)
+
 ```bash
 autosumm init
 ```
+
 This will guide you through:
+
 - LLM provider selection and API key setup
 - ArXiv categories configuration
 - Email delivery setup
 - Validation and testing
 
 ### 2. Manual Configuration
+
 ```bash
 cp config.yaml my_config.yaml
 # Edit my_config.yaml with your custom settings
@@ -57,7 +63,9 @@ autosumm run --config my_config.yaml # run pipeline
 ```
 
 ### 3. Environment Variables *(Optional)*
+
 Use `.env` file or environment variables for sensitive data:
+
 ```bash
 # .env file
 DASHSCOPE_API_KEY=your-key-here
@@ -65,6 +73,7 @@ SMTP_PASSWORD=your-app-password
 ```
 
 ### 4. Start with CLI Commands
+
 ```bash
 # Run the complete pipeline
 autosumm run [--config path/to/config.yaml] [--verbose] [--category an_arxiv_category]
@@ -94,9 +103,22 @@ Set up automated daily paper summaries using cron:
 
 ### Systemd Timer (Modern Alternative)
 
-Create a systemd service for more reliable scheduling. **Note**: If you installed arxiv-autosumm in a virtual environment (recommended), use the virtual environment version below.
+Create a systemd service for more reliable scheduling.
 
-#### For System-wide Installation:
+#### Method 1: Direct Python Path (Universal - Works with any environment manager)
+
+```bash
+# First, activate your environment using your preferred method:
+# conda activate myenv
+# source venv/bin/activate  
+# poetry shell
+# pipenv shell
+# etc.
+
+# Then find your Python path
+which python
+
+# Use that exact path in your service file
 ```bash
 # Create service file: ~/.config/systemd/user/arxiv-autosumm.service
 [Unit]
@@ -106,15 +128,16 @@ After=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=/path/to/arxiv-autosumm
-ExecStart=/usr/bin/python3 -m autosumm.cli run --config my_config.yaml
+ExecStart=/your/env/python/path -m autosumm.cli run --config my_config.yaml
 
 [Install]
 WantedBy=default.target
 ```
 
-#### For Virtual Environment Installation (Recommended):
+#### Method 2: Environment Activation (If Method 1 doesn't work)
+
 ```bash
-# Create service file: ~/.config/systemd/user/arxiv-autosumm.service
+# For most virtual environments (adjust activation command for your setup):
 [Unit]
 Description=ArXiv AutoSumm Daily Pipeline
 After=network-online.target
@@ -122,13 +145,20 @@ After=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=/path/to/arxiv-autosumm
-ExecStart=/bin/bash -c 'source /path/to/your-venv/bin/activate && python -m autosumm.cli run --config my_config.yaml'
+ExecStart=/bin/bash -c 'source /path/to/activate-script && python -m autosumm.cli run --config my_config.yaml'
 
 [Install]
 WantedBy=default.target
 ```
 
-#### Timer Configuration (same for both):
+Common activation scripts by environment type:
+
+- venv/virtualenv: `source /path/to/venv/bin/activate`
+- conda: `source /path/to/conda/etc/profile.d/conda.sh && conda activate env-name`
+- poetry: `cd /project/dir && poetry run python -m autosumm.cli run --config my_config.yaml`
+
+#### Timer Configuration
+
 ```bash
 # Create timer file: ~/.config/systemd/user/arxiv-autosumm.timer
 [Unit]
@@ -142,17 +172,23 @@ Persistent=true
 WantedBy=timers.target
 ```
 
-#### Enable and start:
+#### Testing Your Setup
+
 ```bash
+# Test the exact command from your service file
+/your/env/python/path -m autosumm.cli run --config my_config.yaml
+
+# Then proceed with systemd setup
 systemctl --user daemon-reload
 systemctl --user enable arxiv-autosumm.timer
 systemctl --user start arxiv-autosumm.timer
-systemctl --user list-timers
+systemctl --user list-timers # should see arxiv-autosumm
 ```
 
 ### Manual CLI Usage
 
 **Daily workflow:**
+
 ```bash
 # Run pipeline with one of the categories 
 autosumm run
@@ -174,13 +210,14 @@ The complete chronological pipeline processes research papers in the exact order
 - **4. PDF Download**: Retrieves full PDFs for newly discovered papers
 - **5. Fast Parse**: Extracts text using PyPDF2 for quick initial processing
 - **6. Embedder Rate** *(Optional)*: Uses embedding similarity to select top-k papers based on relevance to your interests
-- **7. LLM Rate** *(Optional)*: Uses language models to score papers on configured criteria (novelty, methodology, clarity)
+- **7. LLM Rate** *(Optional)*: Uses language models to score papers on configured criteria (novelty, methodology, clarity... based on your configuration)
 - **8. VLM Parse** *(Optional)*: Uses Vision Language Models for enhanced OCR on complex layouts and figures
 - **9. Summarize**: Generates concise technical summaries using your configured LLM
 - **10. Render**: Creates outputs in PDF, HTML, Markdown, or AZW3 formats
 - **11. Deliver**: Sends formatted summaries via email
 
 ### Rating Strategies
+
 You can configure three different rating approaches based on your needs:
 
 - **llm**: Uses only LLM rating (most accurate, higher cost)
@@ -188,6 +225,7 @@ You can configure three different rating approaches based on your needs:
 - **hybrid**: Uses embedder -> LLM hierarchical rating (balanced approach)
 
 Configure in `config.yaml`:
+
 ```yaml
 rate:
   strategy: llm  # llm, embedder or hybrid
@@ -204,6 +242,7 @@ rate:
 | **AZW3** | Calibre (ebook-convert) + pandoc | Kindle format with table of contents |
 
 ### Format Requirements
+
 ```bash
 # Ubuntu/Debian
 sudo apt-get install texlive-latex-base texlive-latex-extra texlive-xetex pandoc calibre
@@ -212,6 +251,7 @@ sudo apt-get install texlive-latex-base texlive-latex-extra texlive-xetex pandoc
 ## Basic Configuration
 
 ### Run
+
 ```yaml
 run:
   categories: ["cs.AI", "cs.RO"] # arxiv categories you're interested in.
@@ -220,6 +260,7 @@ run:
 ```
 
 ### Fetch
+
 ```yaml
 fetch:
   days: 8
@@ -228,6 +269,7 @@ fetch:
 ```
 
 ### Summarizer Config
+
 ```yaml
 summarize:
   provider: deepseek
@@ -244,6 +286,7 @@ summarize:
 ```
 
 ### Paper Rating
+
 ```yaml
 rate:
   strategy: llm # llm, embedder or hybrid
@@ -274,11 +317,13 @@ rate:
 ```
 
 **Parameter Flow:**
+
 - **fetch:max_results** → initial paper limit from ArXiv
 - **rate:top_k** → papers passed to LLM for rating (after optional embedder filtering)
 - **rate:max_selected** → final papers selected for optional vlm parsing and summarization (after rating)
 
 ### Render Config
+
 ```yaml
 render:
   formats: ["pdf", "md"] # summaries' formats, default setting gives you .pdf and .md files
@@ -287,6 +332,7 @@ render:
 ```
 
 ### Deliver and Email
+
 ```yaml
 deliver:
   smtp_server
@@ -297,6 +343,7 @@ deliver:
 ```
 
 ### Default LLM Providers
+
 | Provider | Example Model | Notes |
 |----------|---------------|--------|
 | **OpenAI** | gpt-4o, gpt-4o-mini | Requires OPENAI_API_KEY |
@@ -310,7 +357,8 @@ deliver:
 
 ## Common Issues
 
-**API Connection Problems**
+### **API Connection Problems**
+
 ```bash
 # Test API connectivity
 curl -H "Authorization: Bearer YOUR_KEY" \
@@ -320,13 +368,15 @@ curl -H "Authorization: Bearer YOUR_KEY" \
 autosumm test-config # check connectiviy, authentication, batch/vision support (if configured) and completion_options validity
 ```
 
-**Email Delivery Issues**
+### **Email Delivery Issues**
+
 ```bash
 # Test SMTP connection
 autosumm test-config --skip-api-checks
 ```
 
-**PDF Generation Fails**
+### **PDF Generation Fails**
+
 ```bash
 # Check TeXLive installation
 which xelatex
@@ -339,7 +389,8 @@ sudo apt-get install texlive-latex-base texlive-latex-extra texlive-xetex pandoc
 autosumm test-config --skip-api-checks
 ```
 
-**AZW3 Conversion Issues**
+### **AZW3 Conversion Issues**
+
 ```bash
 # Check Calibre installation
 which ebook-convert
@@ -354,7 +405,8 @@ autosumm test-config --skip-api-checks
 
 ## Environment Setup
 
-**Setting up .env file**
+### **Setting up .env file**
+
 ```bash
 # Create .env file
 cat > .env << EOF
@@ -371,7 +423,6 @@ autosumm run --config my_config.yaml
 
 You can also set these variables in ~/.bashrc, ~/.zshrc, etc. Using your API keys directly without hiding it is also totally fine, as long as you're sure about the safety issue.
 
-
 ## 🚨 Known Limitations
 
 - **Docker support**: Not yet implemented (planned)
@@ -380,7 +431,7 @@ You can also set these variables in ~/.bashrc, ~/.zshrc, etc. Using your API key
 - **Rate limiting**: Some providers may have aggressive rate limits
 - **VLM Parsing**: Enabling VLM parsing may require significant time and tokens, especially for large PDFs, and the parsing quality is not guaranteed (rely on the specific model and prompts)
 
-## Future Plan:
+## Future Plan
 
 - **Docker**: Add docker support. Will probably add a setup.sh for local build while also preparing an docker image for immediate use
 - **Convenient Tests**: Add cli commands to do unit tests, enabling users to quickly find the prompt best tailored to their model

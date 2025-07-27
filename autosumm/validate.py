@@ -334,7 +334,7 @@ class ConfigValidator:
                     success=True,
                     message=f"VLM Parser: API connected successfully ({parse_config.vlm.model})",
                     details={
-                        "model": parse_config.model,
+                        "model": parse_config.vlm.model,
                         "test_paper": "arXiv:2302.12854 (short paper: 2 pages)",
                         "content_length": len(results[0].content) if results[0].content else 0
                     }
