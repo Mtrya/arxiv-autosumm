@@ -15,6 +15,16 @@ Automated research paper summarization from ArXiv with LLM-powered rating, multi
 ## 📦 Installation
 
 ### Method 1: Development Installation
+
+Create and activate an virtual environment (optional but recommended)
+```bash
+# python3 -m venv arxiv-env
+# source arxiv-env/bin/activate
+# Or using conda
+# conda create -n arxiv-env
+# conda activate arxiv-env
+```
+Then install in the virtual environment
 ```bash
 git clone https://github.com/Mtrya/arxiv-autosumm.git
 cd arxiv-autosumm
@@ -46,7 +56,7 @@ autosumm test-config --config my_config.yaml # test if config is valid
 autosumm run --config my_config.yaml # run pipeline
 ```
 
-### 3. Environment Variables
+### 3. Environment Variables *(Optional)*
 Use `.env` file or environment variables for sensitive data:
 ```bash
 # .env file
@@ -56,14 +66,11 @@ SMTP_PASSWORD=your-app-password
 
 ### 4. Start with CLI Commands
 ```bash
-# Interactive setup wizard
-autosumm init [--config path/to/config.yaml]
-
 # Run the complete pipeline
 autosumm run [--config path/to/config.yaml] [--verbose] [--category an_arxiv_category]
 
-# Test configuration and connectivity
-autosumm test_config [--config path/to/config.yaml] [--skip-api-checks]
+# Or simply:
+autosumm run
 
 # Get help
 autosumm --help
@@ -87,8 +94,9 @@ Set up automated daily paper summaries using cron:
 
 ### Systemd Timer (Modern Alternative)
 
-Create a systemd service for more reliable scheduling:
+Create a systemd service for more reliable scheduling. **Note**: If you installed arxiv-autosumm in a virtual environment (recommended), use the virtual environment version below.
 
+#### For System-wide Installation:
 ```bash
 # Create service file: ~/.config/systemd/user/arxiv-autosumm.service
 [Unit]
@@ -100,20 +108,41 @@ Type=oneshot
 WorkingDirectory=/path/to/arxiv-autosumm
 ExecStart=/usr/bin/python3 -m autosumm.cli run --config my_config.yaml
 
+[Install]
+WantedBy=default.target
+```
+
+#### For Virtual Environment Installation (Recommended):
+```bash
+# Create service file: ~/.config/systemd/user/arxiv-autosumm.service
+[Unit]
+Description=ArXiv AutoSumm Daily Pipeline
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/path/to/arxiv-autosumm
+ExecStart=/bin/bash -c 'source /path/to/your-venv/bin/activate && python -m autosumm.cli run --config my_config.yaml'
+
+[Install]
+WantedBy=default.target
+```
+
+#### Timer Configuration (same for both):
+```bash
 # Create timer file: ~/.config/systemd/user/arxiv-autosumm.timer
 [Unit]
 Description=Run ArXiv AutoSumm daily
-Requires=arxiv-autosumm.service
 
 [Timer]
-OnCalendar=daily
+OnCalendar=*-*-* 2:00:00
 Persistent=true
 
 [Install]
 WantedBy=timers.target
 ```
 
-Enable and start:
+#### Enable and start:
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable arxiv-autosumm.timer
@@ -125,7 +154,7 @@ systemctl --user list-timers
 
 **Daily workflow:**
 ```bash
-# Run pipeline with one of the category
+# Run pipeline with one of the categories 
 autosumm run
 
 # Run pipeline with specified category
@@ -139,17 +168,17 @@ autosumm run --verbose
 
 The complete chronological pipeline processes research papers in the exact order of execution:
 
-**1. Fetch** - Downloads paper metadata from ArXiv using configured categories or date ranges
-**2. Deduplication** - Uses SQLite cache to skip already-processed papers, preventing redundant work
-**3. Rate Limiting** - Respects ArXiv API limits with exponential backoff to avoid being blocked
-**4. PDF Download** - Retrieves full PDFs for newly discovered papers
-**5. Fast Parse** - Extracts text using PyPDF2 for quick initial processing
-**6. Embedder Rate** *(Optional)* - Uses embedding similarity to select top-k papers based on relevance to your interests
-**7. LLM Rate** *(Optional)* - Uses language models to score papers on configured criteria (novelty, methodology, clarity)
-**8. VLM Parse** *(Optional)* - Uses Vision Language Models for enhanced OCR on complex layouts and figures
-**9. Summarize** - Generates concise technical summaries using your configured LLM
-**10. Render** - Creates outputs in PDF, HTML, Markdown, or AZW3 formats
-**11. Deliver** - Sends formatted summaries via email
+- **1. Fetch**: Downloads paper metadata from ArXiv using configured categories or date ranges
+- **2. Deduplication**: Uses SQLite cache to skip already-processed papers, preventing redundant work
+- **3. Rate Limiting**: Respects ArXiv API limits with exponential backoff to avoid being blocked
+- **4. PDF Download**: Retrieves full PDFs for newly discovered papers
+- **5. Fast Parse**: Extracts text using PyPDF2 for quick initial processing
+- **6. Embedder Rate** *(Optional)*: Uses embedding similarity to select top-k papers based on relevance to your interests
+- **7. LLM Rate** *(Optional)*: Uses language models to score papers on configured criteria (novelty, methodology, clarity)
+- **8. VLM Parse** *(Optional)*: Uses Vision Language Models for enhanced OCR on complex layouts and figures
+- **9. Summarize**: Generates concise technical summaries using your configured LLM
+- **10. Render**: Creates outputs in PDF, HTML, Markdown, or AZW3 formats
+- **11. Deliver**: Sends formatted summaries via email
 
 ### Rating Strategies
 You can configure three different rating approaches based on your needs:
@@ -169,7 +198,7 @@ rate:
 
 | Format | Dependencies | Notes |
 |--------|--------------|--------|
-| **Markdown** | None | Primary format, includes metadata |
+| **Markdown** | None | Primary format, always available |
 | **HTML** | pandoc | MathJax support for equations |
 | **PDF** | TeXLive + pandoc | Uses XeLaTeX engine, includes bibliography |
 | **AZW3** | Calibre (ebook-convert) + pandoc | Kindle format with table of contents |
@@ -254,7 +283,7 @@ rate:
 render:
   formats: ["pdf", "md"] # summaries' formats, default setting gives you .pdf and .md files
   output_dir: ./output # autosumm will output these summaries to output_dir, then deliver to you via email
-  base_filename: null # default to "summary". Summary naming is {base_filename}_{category}_{year}_{week}.{extension_name}
+  base_filename: null # default to "summary". Summary naming is {base_filename}_{category}_{year&week}.{extension_name}
 ```
 
 ### Deliver and Email
