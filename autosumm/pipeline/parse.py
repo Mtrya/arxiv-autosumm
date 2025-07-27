@@ -12,6 +12,9 @@ import fitz
 import base64
 from arxiv2text import arxiv_to_md
 import logging
+import multiprocessing
+import shutil
+import uuid
 
 try:
     from client import BaseClient, BatchConfig
@@ -242,62 +245,71 @@ def parse_vlm(pdf_urls: List[str], config: ParserConfig, batch_config: Optional[
 
     return results
 
+def _parse_fast_single(args: tuple) -> ParseResult:
+    """Helper function to parse a single PDF in an isolated directory"""
+    pdf_url, config, pdf_index = args
+
+    # Crete a unique temp dir for this job to avoid race conditions
+    job_tmp_dir = Path(config.tmp_dir) / f"fast_parse_{pdf_index}_{uuid.uuid4()}"
+    job_tmp_dir.mkdir(parents=True,exist_ok=True)
+
+    try:
+        logger.debug(f"Processing PDF {pdf_index+1} ({pdf_url}) in worker {os.getpid()}")
+
+        arxiv_to_md(pdf_url, str(job_tmp_dir))
+
+        generated_files = [f for f in os.listdir(job_tmp_dir) if f.endswith('.md')]
+        if not generated_files:
+            raise ValueError("arxiv2text did not produce a markdown file.")
+        md_file_path = job_tmp_dir / generated_files[0]
+
+        with open(md_file_path,'r',encoding='utf-8') as file:
+            content = file.read()
+
+        # Remove inappropriate line breaks within paragraphs
+        content = re.sub(r'(?<!\n)\n(?!\n)', ' ', content)
+        
+        # Remove content after "References" or "REFERENCES"
+        match = re.search(r'\nReferences\n|\nREFERENCES\n', content)
+        if match:
+            content = content[:match.start()]
+        
+        logger.debug(f"Successfully parsed PDF {pdf_index+1}")
+        return ParseResult(
+            content=content,
+            success=True,
+            method="fast"
+        )
+    
+    except Exception as e:
+        logger.error(f"Failed to parse PDF {pdf_index+1} ({pdf_url}): {e}")
+        return ParseResult(
+            content="",
+            success=False,
+            error=str(e),
+            method="fast"
+        )
+    finally:
+        # Clean up the temporary job directory
+        if job_tmp_dir.exists():
+            shutil.rmtree(job_tmp_dir)
+
 def parse_fast(pdf_urls: List[str], config: ParserConfig) -> List[ParseResult]:
     """
     Fast parsing using arxiv2text for rating phase.
+    Uses multiprocessing to accelerate PDF parsing.
     """
-    # TODO: use multiprocesing to accelerate pdfminer-based paper parsing
-    results = []
-    logger.info(f"Starting fast parsing for {len(pdf_urls)} PDFs")
-    for pdf_index, pdf_url in enumerate(pdf_urls):
-        try:
-            logger.debug(f"Processing PDF {pdf_index+1}/{len(pdf_urls)}: {pdf_url}")
-            # Use arxiv2text to convert PDF to markdown
-            arxiv_to_md(pdf_url, config.tmp_dir)
-            
-            # Find the generated markdown file
-            generated_files = [f for f in os.listdir(config.tmp_dir) if f.endswith('.md')]
-            if not generated_files:
-                raise ValueError("No markdown files found.")
-            
-            # Get the most recent file
-            generated_files.sort(key=lambda f: os.path.getmtime(os.path.join(config.tmp_dir, f)), reverse=True)
-            latest_file_path = os.path.join(config.tmp_dir, generated_files[0])
-            
-            # Read and clean the content
-            with open(latest_file_path, 'r', encoding='utf-8') as file:
-                content = file.read()
-            
-            # Remove inappropriate line breaks within paragraphs
-            content = re.sub(r'(?<!\n)\n(?!\n)', ' ', content)
-            
-            # Remove content after "References" or "REFERENCES"
-            match = re.search(r'\nReferences\n|\nREFERENCES\n', content)
-            if match:
-                content = content[:match.start()]
-            
-            # Clean up the temporary markdown file
-            os.remove(latest_file_path)
-            
-            results.append(
-                ParseResult(
-                content=content,
-                success=True,
-                method="fast"
-            ))
-            logger.debug(f"Successfully parsed PDF {pdf_index+1}")
-        
-        except Exception as e:
-            logger.error(f"Failed to parse PDF {pdf_index+1}: {e}")
-            results.append(ParseResult(
-                content="",
-                success=False,
-                error=str(e),
-                method="fast"
-            ))
+    logger.info(f"Starting fast parsing for {len(pdf_urls)} PDFs using multiprocessing")
+
+    tasks = [(url, config, i) for i, url in enumerate(pdf_urls)]
+
+    with multiprocessing.Pool() as pool:
+        results = pool.map(_parse_fast_single, tasks)
+    
     logger.info(f"Fast parsing completed: {len([r for r in results if r.success])} successful, {len([r for r in results if not r.success])} failed")
         
     return results
+
     
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ Automated research paper summarization from ArXiv with LLM-powered rating, multi
 ## 🚀 What Works Now
 
 **✅ Complete 15-step pipeline**: fetch → parse → rate → summarize → render → deliver  
-**✅ CLI**: Interactive setup, configuration testing, and summarization pipeline running
+**✅ CLI**: Interactive setup, configuration testing, and summarization pipeline running  
 **✅ Multi-format output**: Markdown, HTML, PDF, AZW3 (Kindle)  
 **✅ Smart caching**: SQLite-based with TTL, config change detection, and rate limiting  
 **✅ VLM-powered parsing**: Vision Language Model OCR for enhanced PDF processing  
@@ -433,7 +433,6 @@ You can also set these variables in ~/.bashrc, ~/.zshrc, etc. Using your API key
 
 ## Future Plan
 
-- **Multiprocessing for Fast Parsing**: Leverage multiprocessing to accelerate pdfminer-based fast paper parsing
 - **Docker**: Add docker support. Will probably add a setup.sh for local build while also preparing an docker image for immediate use
 - **Convenient Tests**: Add cli commands to do unit tests, enabling users to quickly find the prompt best tailored to their model
 - **Cross Platform**: Add Window support. I don't have a Mac and have never used MacOS before, so I'm afraid I can't test it on MacOS. Welcome contributions.

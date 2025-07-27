@@ -67,7 +67,7 @@ rate:
   
 parse:
   enable_vlm: true
-  tmp_dir: ./tmp_dir
+  tmp_dir: ./tmp
   vlm:
     provider: modelscope
     api_key: env:SILICONFLOW_API_KEY
