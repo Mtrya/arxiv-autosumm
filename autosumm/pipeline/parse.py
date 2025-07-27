@@ -39,6 +39,7 @@ class ParserVLMConfig:
 class ParserConfig:
     enable_vlm: bool
     tmp_dir: str
+    fast_parser_timeout_seconds: int
     vlm: Optional[ParserVLMConfig]
 
 @dataclass
@@ -245,6 +246,8 @@ def parse_vlm(pdf_urls: List[str], config: ParserConfig, batch_config: Optional[
 
     return results
 
+# TODO: profiling founds that _parse_fast_single is I/O-bound instead of CPU-bound, should change it to multithreading instead
+
 def _parse_fast_single(args: tuple) -> ParseResult:
     """Helper function to parse a single PDF in an isolated directory"""
     pdf_url, config, pdf_index = args
@@ -302,9 +305,32 @@ def parse_fast(pdf_urls: List[str], config: ParserConfig) -> List[ParseResult]:
     logger.info(f"Starting fast parsing for {len(pdf_urls)} PDFs using multiprocessing")
 
     tasks = [(url, config, i) for i, url in enumerate(pdf_urls)]
+    results = []
 
     with multiprocessing.Pool() as pool:
-        results = pool.map(_parse_fast_single, tasks)
+        async_results = [pool.apply_async(_parse_fast_single, args=(tasks,)) for task in tasks]
+
+        for i, async_results in enumerate(async_results):
+            pdf_url = tasks[i][0]
+            try:
+                result = async_results(timeout=config.fast_parser_timeout_seconds)
+                results.append(result)
+            except TimeoutError:
+                logger.warning(f"Parsing timed out for PDF: {pdf_url}")
+                results.append(ParseResult(
+                    content="",
+                    success=False,
+                    error=f"Parsing timed out after {config.fast_parser_timeout_seconds} seconds.",
+                    method="fast"
+                ))
+            except Exception as e:
+                logger.error(f"An unexpected error occurred while parsing PDF {pdf_url}: {e}")
+                results.append(ParseResult(
+                    content="",
+                    success=False,
+                    error=f"An unexpected error occurred: {e}",
+                    method="fast"
+                ))
     
     logger.info(f"Fast parsing completed: {len([r for r in results if r.success])} successful, {len([r for r in results if not r.success])} failed")
         

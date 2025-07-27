@@ -269,6 +269,13 @@ class RaterLLMClient(BaseClient):
         messages.append({"role": "user", "content": user_content})
         return messages
 
+    def process_single(self, input_data, sleep_time = 0.0): # embedder usually have looser rate limit
+        """Process single input, raising exception on failure."""
+        result = super().process_single(input_data, sleep_time)
+        if result == "": # error from base client, turn to int
+            raise 0.0
+        return result
+
 def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Optional[BatchConfig]=None) -> List[RateResult]:
     """Rate papers using embedding similarity with text chunking."""
     embedder_client = RaterEmbedderClient(config.embedder, batch_config)

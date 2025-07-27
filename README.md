@@ -7,10 +7,6 @@ Automated research paper summarization from ArXiv with LLM-powered rating, multi
 **✅ Complete 15-step pipeline**: fetch → parse → rate → summarize → render → deliver  
 **✅ CLI**: Interactive setup, configuration testing, and summarization pipeline running  
 **✅ Multi-format output**: Markdown, HTML, PDF, AZW3 (Kindle)  
-**✅ Smart caching**: SQLite-based with TTL, config change detection, and rate limiting  
-**✅ VLM-powered parsing**: Vision Language Model OCR for enhanced PDF processing  
-**✅ Comprehensive validation**: API connectivity, dependency checks, and error handling  
-**✅ Environment variables**: Full .env support with secure credential management
 
 ## 📦 Installation
 
@@ -210,7 +206,7 @@ The complete chronological pipeline processes research papers in the exact order
 - **4. PDF Download**: Retrieves full PDFs for newly discovered papers
 - **5. Fast Parse**: Extracts text using PyPDF2 for quick initial processing
 - **6. Embedder Rate** *(Optional)*: Uses embedding similarity to select top-k papers based on relevance to your interests
-- **7. LLM Rate** *(Optional)*: Uses language models to score papers on configured criteria (novelty, methodology, clarity... based on your configuration)
+- **7. LLM Rate** *(Optional)*: Uses language models to score papers on configured criteria (novelty, methodology, clarity, etc. Based on your configuration)
 - **8. VLM Parse** *(Optional)*: Uses Vision Language Models for enhanced OCR on complex layouts and figures
 - **9. Summarize**: Generates concise technical summaries using your configured LLM
 - **10. Render**: Creates outputs in PDF, HTML, Markdown, or AZW3 formats
@@ -231,6 +227,12 @@ rate:
   strategy: llm  # llm, embedder or hybrid
   top_k: 80 # if strategy is hybrid, set this parameter
 ```
+
+**Parameter Flow:**
+
+- **fetch:max_results** → initial paper limit from ArXiv
+- **rate:top_k** → papers passed to LLM for rating (after optional embedder filtering)
+- **rate:max_selected** → final papers selected for optional vlm parsing and summarization (after rating)
 
 ## 📊 Output Formats
 
@@ -315,12 +317,6 @@ rate:
         description: How well-written and understandable is the paper?
         weight: 0.2
 ```
-
-**Parameter Flow:**
-
-- **fetch:max_results** → initial paper limit from ArXiv
-- **rate:top_k** → papers passed to LLM for rating (after optional embedder filtering)
-- **rate:max_selected** → final papers selected for optional vlm parsing and summarization (after rating)
 
 ### Render Config
 

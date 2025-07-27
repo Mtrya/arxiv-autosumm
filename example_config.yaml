@@ -40,7 +40,7 @@ rate:
     provider: siliconflow
     api_key: env:SILICONFLOW_API_KEY
     base_url: https://api.siliconflow.cn/v1
-    model: THUDM/glm-4-9b-chat
+    model: Pro/THUDM/glm-4-9b-chat
     batch: false
     system_prompt: "You are an expert research paper evaluator"
     user_prompt_template: file:prompts/rate_lm/user.md
@@ -68,6 +68,7 @@ rate:
 parse:
   enable_vlm: true
   tmp_dir: ./tmp
+  fast_parser_timeout_seconds: 300
   vlm:
     provider: modelscope
     api_key: env:SILICONFLOW_API_KEY

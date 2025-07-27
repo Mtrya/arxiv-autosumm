@@ -439,8 +439,14 @@ class ParserVLMConfig(BaseModel):
 class ParserConfig(BaseModel):
     enable_vlm: bool=False
     tmp_dir: Optional[str]="./tmp"
+    fast_parser_timeout_seconds: int=224
     vlm: Optional[ParserVLMConfig]=None
     """If enable_vlm is False, then ParserVLMConfig is not required"""
+
+    @field_validator('fast_parser_timeout_seconds')
+    @classmethod
+    def validate_timeout(cls, v) -> int:
+        return max(10,min(v,3600))
 
     @field_validator('vlm')
     @classmethod
@@ -454,6 +460,7 @@ class ParserConfig(BaseModel):
         return ParserConfig_(
             enable_vlm=self.enable_vlm,
             tmp_dir=self.tmp_dir,
+            fast_parser_timeout_seconds=self.fast_parser_timeout_seconds,
             vlm=self.vlm.to_pipeline_config() if self.vlm else None
         )
 
