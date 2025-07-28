@@ -179,6 +179,13 @@ class RaterEmbedderClient(BaseClient):
         response.raise_for_status()
 
         return json.dumps(response.json())
+    
+    def process_single(self, input_data, sleep_time = 0.0):
+        """Process single input, raising exception on failure."""
+        result = super().process_single(input_data, sleep_time)
+        if result == "": # error from base client, turn to int
+            return 0.0
+        return result
               
 class RaterLLMClient(BaseClient):
     def __init__(self, config: RaterLLMConfig, batch_config: Optional[BatchConfig]=None):
@@ -269,11 +276,11 @@ class RaterLLMClient(BaseClient):
         messages.append({"role": "user", "content": user_content})
         return messages
 
-    def process_single(self, input_data, sleep_time = 0.0): # embedder usually have looser rate limit
+    def process_single(self, input_data, sleep_time = 10.0):
         """Process single input, raising exception on failure."""
         result = super().process_single(input_data, sleep_time)
         if result == "": # error from base client, turn to int
-            raise 0.0
+            return 0.0
         return result
 
 def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Optional[BatchConfig]=None) -> List[RateResult]:
@@ -331,7 +338,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
 
 def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Optional[BatchConfig]=None) -> List[RateResult]:
     """Rate multiple papers using batch processing when configured"""
-    logger.info(f"Starting LLM-based rating for {len(parsed_contents)} papers (batch={getattr(config, 'batch', False)})")
+    logger.info(f"Starting LLM-based rating for {len(parsed_contents)} papers (batch={getattr(config.llm, 'batch', False)})")
     if not getattr(config, 'batch', False):
         client = RaterLLMClient(config.llm,batch_config)
         results = [client.process_single(content) for content in parsed_contents]

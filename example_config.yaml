@@ -12,16 +12,16 @@ fetch:
   max_retries: 10
 
 summarize:
-  provider: siliconflow
-  api_key: env:SILICONFLOW_API_KEY
-  base_url: https://api.siliconflow.cn/v1
-  model: deepseek-ai/DeepSeek-R1
+  provider: deepseek
+  api_key: env:DEEPSEEK_API_KEY
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-reasoner
   batch: true
   system_prompt: file:./prompts/summ_lm/system.md
   user_prompt_template: file:./prompts/summ_lm/user.md
   completion_options:
     temperature: 0.6
-  context_length: 98304
+  context_length: 65536
 
 rate:
   strategy: hybrid
@@ -37,11 +37,11 @@ rate:
     user_interests: "AI, machine learning, astronomy and astronautics"
     context_length: 32768
   llm:
-    provider: siliconflow
-    api_key: env:SILICONFLOW_API_KEY
-    base_url: https://api.siliconflow.cn/v1
-    model: Pro/THUDM/glm-4-9b-chat
-    batch: false
+    provider: deepseek
+    api_key: env:DEEPSEEK_API_KEY
+    base_url: https://api.deepseek.com/v1
+    model: deepseek-chat
+    batch: true
     system_prompt: "You are an expert research paper evaluator"
     user_prompt_template: file:prompts/rate_lm/user.md
     completion_options:
@@ -95,6 +95,40 @@ render:
   formats: ["pdf"]
   output_dir: ./output
   base_filename: null
+  md:
+    include_pagebreaks: true
+  pdf:
+    pdf_engine: xelatex
+    highlight_style: pygments
+    font_size: 14pt
+    document_class: extarticle
+    margin: 1.0in
+    colorlinks: true
+    link_color: RoyalBlue
+    line_stretch: 1.10
+    pandoc_input_format: "markdown+raw_tex+yaml_metadata_block"
+    pandoc_from_format: gfm
+  html:
+    math_renderer: mathjax
+    mathjax_url: null
+    katex_url: null
+    include_toc: true
+    toc_depth: 3
+    number_sections: false
+    standalone: true
+    self_contained: false
+    css_file: null
+    css_inline: null
+    template_file: null
+    highlight_style: pygments
+    html5: true
+  azw3:
+    calibre_path: /usr/bin/calibre
+    author: "ArXiv AutoSumm"
+    language: enable_vlm
+    description: null
+    cover_image: null
+    
 
 deliver:
   smtp_server: smtp.163.com

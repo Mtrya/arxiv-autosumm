@@ -661,7 +661,7 @@ class MainConfig(BaseModel):
                             # The error message from _resolve_references now contains the
                             # full path, so we report it as a single, clear error message.
                             'loc': ('config',),
-                            'msg': str(e),
+                            'msg': str(e) + " check if references ('env:' and 'file:') are correctly set",
                             'input': 'file: or env: reference',
                         }
                     ],

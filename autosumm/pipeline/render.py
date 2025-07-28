@@ -9,6 +9,7 @@ import subprocess
 import re
 import logging
 from datetime import datetime
+from pymarkdown.api import PyMarkdownApi, PyMarkdownApiException
 
 try:
     from client import BaseClient, BatchConfig
@@ -27,10 +28,10 @@ class PDFRendererConfig:
     highlight_style: str="pygments"
     font_size: str="14pt"
     document_class: str="extarticle"
-    margin: str="0.8in"
+    margin: str="1.0in"
     colorlinks: bool=True
     link_color: str="RoyalBlue"
-    line_stretch: float=1.15
+    line_stretch: float=1.10
     pandoc_input_format: str="markdown+raw_tex+yaml_metadata_block"
     pandoc_from_format: str="gfm"
 
@@ -86,7 +87,7 @@ def _generate_base_filename(category: str, config: RendererConfig) -> str:
     category_clean = category.replace('.','')
 
     if config.base_filename:
-        return f"config.base_filename{current_year-2000:02d}{current_week_number:02d}"
+        return f"{config.base}_filename{current_year-2000:02d}{current_week_number:02d}"
 
     return f"summary_{category_clean}_{current_year-2000:02d}{current_week_number:02d}"
 
@@ -101,13 +102,22 @@ def render_md(summaries: List[str], category: str, config: RendererConfig) -> Re
     base_filename = _generate_base_filename(category, config)
     md_file = output_path / f"{base_filename}.md"
 
+    try:
+        api = PyMarkdownApi()
+        fixed_summaries = []
+        for summary in summaries:
+            fix_result = api.fix_string(summary)
+            fixed_summaries.append(fix_result.fixed_file)
+    except PyMarkdownApiException as e:
+        logger.warning(f"PyMarkdownApi failed, falling back to raw markdown: {e}")
+        fixed_summaries = summaries
+
+
     if config.md.include_pagebreaks:
         separator = "\n\n\\pagebreak\n\n"
-        content = separator.join(summaries)
+        content = separator.join(fixed_summaries)
     else:
-        content = "\n\n".join(summaries)
-    
-    content = re.sub(r'\n{3,}', r'\n\n', content)
+        content = "\n\n".join(fixed_summaries)
 
     md_file.write_text(content, encoding='utf-8')
 

@@ -262,21 +262,21 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
         # 0. Load and check configuration change
         logger.info("Loading configuration...")
         config = MainConfig.from_yaml(config_path).get_pipeline_configs()
-        cacher = Cacher(config["cache"])
-        cacher.detect_and_handle_config_changes(config["rate"])
         logger, log_file_path = setup_logging(
             log_dir=config.get("log_dir","./logs"),
             send_log=config.get("send_log",False)
         )
+        cacher = Cacher(config["cache"])
+        cacher.detect_and_handle_config_changes(config["rate"])
         logger.info("Configuration loaded successfully")
 
         # 1. Determine category to fetch
         today = date.today()
-        if specified_category is not None:
+        if (specified_category is not None) and (specified_category != "None"):
             if specified_category in arxiv_categories:
                 category = specified_category
             else:
-                logger.warning(f"Specified category {specified_category} invalid, fallback to default date-based category")
+                logger.warning(f"Specified category '{specified_category}' invalid, fallback to default date-based category")
                 categories = config["categories"]
                 category = categories[int(today.strftime('%j')) % len(categories)]
         else:
