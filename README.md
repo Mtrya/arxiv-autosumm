@@ -125,6 +125,9 @@ After=network-online.target
 Type=oneshot
 WorkingDirectory=/path/to/arxiv-autosumm
 ExecStart=/your/env/python/path -m autosumm.cli run --config my_config.yaml
+# Note that systemd services executes commands directly using execve(), so env variables in .bashrc won't work,
+# to explicitly invoke shell features (bash for example), use
+# /bin/bash -c '/your/env/python/path -m autosumm.cli run --config my_config.yaml'
 
 [Install]
 WantedBy=default.target
@@ -179,6 +182,8 @@ systemctl --user daemon-reload
 systemctl --user enable arxiv-autosumm.timer
 systemctl --user start arxiv-autosumm.timer
 systemctl --user list-timers # should see arxiv-autosumm
+
+# Try testing with 
 ```
 
 ### Manual CLI Usage

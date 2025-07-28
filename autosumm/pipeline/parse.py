@@ -12,7 +12,7 @@ import fitz
 import base64
 from arxiv2text import arxiv_to_md
 import logging
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import shutil
 import uuid
 
@@ -246,11 +246,8 @@ def parse_vlm(pdf_urls: List[str], config: ParserConfig, batch_config: Optional[
 
     return results
 
-# TODO: profiling founds that _parse_fast_single is I/O-bound instead of CPU-bound, should change it to multithreading instead
-
-def _parse_fast_single(args: tuple) -> ParseResult:
+def _parse_fast_single(pdf_url: str, config: ParserConfig, pdf_index: int) -> ParseResult:
     """Helper function to parse a single PDF in an isolated directory"""
-    pdf_url, config, pdf_index = args
 
     # Crete a unique temp dir for this job to avoid race conditions
     job_tmp_dir = Path(config.tmp_dir) / f"fast_parse_{pdf_index}_{uuid.uuid4()}"
@@ -300,20 +297,24 @@ def _parse_fast_single(args: tuple) -> ParseResult:
 def parse_fast(pdf_urls: List[str], config: ParserConfig) -> List[ParseResult]:
     """
     Fast parsing using arxiv2text for rating phase.
-    Uses multiprocessing to accelerate PDF parsing.
+    Uses multithreading to accelerate PDF parsing.
     """
-    logger.info(f"Starting fast parsing for {len(pdf_urls)} PDFs using multiprocessing")
+    logger.info(f"Starting fast parsing for {len(pdf_urls)} PDFs using multithreading")
 
-    tasks = [(url, config, i) for i, url in enumerate(pdf_urls)]
     results = []
 
-    with multiprocessing.Pool() as pool:
-        async_results = [pool.apply_async(_parse_fast_single, args=(tasks,)) for task in tasks]
+    with ThreadPoolExecutor() as executor:
+        # Submit all tasks
+        future_to_url = {
+            executor.submit(_parse_fast_single, url, config, i): url
+            for i, url in enumerate(pdf_urls)
+        }
 
-        for i, async_results in enumerate(async_results):
-            pdf_url = tasks[i][0]
+        # Collect results as they complete
+        for future in as_completed(future_to_url):
+            pdf_url = future_to_url[future]
             try:
-                result = async_results(timeout=config.fast_parser_timeout_seconds)
+                result = future.result(timeout=config.fast_parser_timeout_seconds)
                 results.append(result)
             except TimeoutError:
                 logger.warning(f"Parsing timed out for PDF: {pdf_url}")

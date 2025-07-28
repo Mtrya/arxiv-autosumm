@@ -56,7 +56,7 @@ def run(
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
     specified_category: str = typer.Option(
-        "cs.AI",
+        None,
         "--specify-category",
         "-s"
     )
