@@ -4,7 +4,7 @@ Automated research paper summarization from ArXiv with LLM-powered rating, multi
 
 ## 🚀 What Works Now
 
-**✅ Complete 15-step pipeline**: fetch → parse → rate → summarize → render → deliver  
+**✅ Complete pipeline**: fetch → parse → rate → summarize → render → deliver  
 **✅ CLI**: Interactive setup, configuration testing, and summarization pipeline running  
 **✅ Multi-format output**: Markdown, HTML, PDF, AZW3 (Kindle)  
 
@@ -355,6 +355,8 @@ deliver:
 | **Moonshot** | kimi-k2-0711-preview | Requires MOONSHOT_API_KEY |
 | **Minimax** | MiniMax-Text-01 | Requires MINIMAX_API_KEY |
 | **ModelScope** | Qwen/Qwen3-235B-A22B-Thinking-2507 | Requires MODELSCOPE_API_KEY |
+| **Zhipu** | glm-4.5, glm-4.5-flash | Requires ZHIPU_API_KEY |
+| **VolcEngine** | doubao-1.6-seed-thinking | Requires ARK_API_KEY |
 
 ## Common Issues
 
@@ -435,10 +437,10 @@ You can also set these variables in ~/.bashrc, ~/.zshrc, etc. Using your API key
 ## Future Plan
 
 - **Docker**: Add docker support. Will probably add a setup.sh for local build while also preparing an docker image for immediate use
-- **Convenient Tests**: Add cli commands to do unit tests, enabling users to quickly find the prompt best tailored to their model
-- **Cross Platform**: Add Window support. I don't have a Mac and have never used MacOS before, so I'm afraid I can't test it on MacOS. Welcome contributions.
-- **More Providers**: Support Anthropic/Gemini/Zhipu/Volc/... compatible SDK
-- **Audio Formats**: Use TTS models to convert summaries to speech
+- **Convenient Tests**: Add cli commands to do unit tests, enabling users to quickly find the prompt best tailored to their need
+- **Cross Platform**: Native Windows development installation
+- **More Providers**: Anthropic API format for Claude
+- **Audio Formats**: Use TTS models to convert summaries to speech, add recommended prompts to summarize papers as conversations.
 
 ## 🔧 Advanced Configuration
 
