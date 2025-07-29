@@ -6,15 +6,13 @@ from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
 from pathlib import Path
 import subprocess
+from multiprocessing import Pool
 import re
+import os
 import logging
 from datetime import datetime
+from contextlib import contextmanager
 from pymarkdown.api import PyMarkdownApi, PyMarkdownApiException
-
-try:
-    from client import BaseClient, BatchConfig
-except:
-    from .client import BaseClient, BatchConfig
 
 logger = logging.getLogger(__name__)
 
@@ -100,21 +98,43 @@ def _ensure_output_dir(output_dir: str) -> Path:
     output_path.mkdir(parents=True, exist_ok=True)
     return output_path
 
+@contextmanager
+def preserve_logging_handlers():
+    """
+    A context manager to preserve and restore the root logger's handlers
+    """
+    root_logger = logging.getLogger()
+    original_handlers = root_logger.handlers[:]
+    try:
+        yield
+    finally:
+        root_logger.handlers = original_handlers
+
+def _fix_single_markdown(summary: str) -> str:
+    """Fixes a single markdown string using PyMarkdownApi.
+    This is designed to be called in a subprocess pool."""
+    try:
+        # PyMarkdownApi calls logging.basicConfig() somewhere inside its own code, therefore corrupts logging,
+        # but it's fine inside a sandboxed process
+        api = PyMarkdownApi()
+        fix_result = api.fix_string(summary)
+        return fix_result.fixed_file
+    except PyMarkdownApiException:
+        return summary
+
 def render_md(summaries: List[str], category: str, config: RendererConfig) -> RenderResult:
     output_path = _ensure_output_dir(config.output_dir)
     base_filename = _generate_base_filename(category, config)
     md_file = output_path / f"{base_filename}.md"
 
     try:
-        api = PyMarkdownApi()
-        fixed_summaries = []
-        for summary in summaries:
-            fix_result = api.fix_string(summary)
-            fixed_summaries.append(fix_result.fixed_file)
-    except PyMarkdownApiException as e:
-        logger.warning(f"PyMarkdownApi failed, falling back to raw markdown: {e}")
+        with preserve_logging_handlers():
+            with Pool() as pool:
+                fixed_summaries = pool.map(_fix_single_markdown,summaries)
+            logger.debug("Successfully fixed markdown in a separate process.")
+    except Exception as e:
+        logger.warning(f"Markdown fixing in a subprocess failed: {e}. Falling back to raw markdown.")
         fixed_summaries = summaries
-
 
     if config.md.include_pagebreaks:
         separator = "\n\n\\pagebreak\n\n"

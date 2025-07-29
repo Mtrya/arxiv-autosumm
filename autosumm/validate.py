@@ -355,25 +355,9 @@ class ConfigValidator:
                 error=str(e),
                 details={"model": parse_config.vlm.model}
             )
-        
-def validate_config(config_path: str) -> Dict[str,ValidationResult]:
-    """Main validation function to be called by CLI"""
-    try:
-        config = MainConfig.from_yaml(config_path).get_pipeline_configs()
-        validator = ConfigValidator(config)
-        return validator.validate_all()
-    except Exception as e:
-        return {"config_load": ValidationResult(
-            success=False,
-            message="Failed to load configuration",
-            error=str(e)
-        )}
 
 
 
 if __name__ == "__main__":
     import sys
     config_path = sys.argv[1] if len(sys.argv) > 1 else "config.yaml"
-
-    print(f"Validation configuration: {config_path}")
-    results = validate_config(config_path)

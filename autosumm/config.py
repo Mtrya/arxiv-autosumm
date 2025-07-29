@@ -57,7 +57,8 @@ recognized_providers = {
     "siliconflow": "https://api.siliconflow.cn/v1",
     "volcengine": "https://ark.cn-beijing.volces.com/api/v3",
     "modelscope": "https://api-inference.modelscope.cn/v1/",
-    "zhipu": "https://open.bigmodel.cn/api/paas/v4"
+    "zhipu": "https://open.bigmodel.cn/api/paas/v4",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/"
 }
 
 valid_options = {
@@ -654,7 +655,7 @@ class MainConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def resolve_references(cls, data: Any) -> Any:
-        if isinstance(data, dict):
+        """if isinstance(data, dict):
             try:
                 return cls._resolve_references(data)
             except ValueError as e:
@@ -671,8 +672,11 @@ class MainConfig(BaseModel):
                             'msg': str(e) + " check if references ('env:' and 'file:') are correctly set",
                             'input': 'file: or env: reference',
                         }
-                    ],
-                )
+                    ]
+                )"""
+        # Let ValueError bubble up naturally instead of trying to wrap it
+        if isinstance(data, dict):
+            return cls._resolve_references(data)
         return data
 
     @classmethod
@@ -703,7 +707,7 @@ class MainConfig(BaseModel):
                     envname = value[4:]
                     value = os.getenv(envname)
                     if value is None:
-                        raise ValueError(f"Environment variable '{envname}' is not set or is empty.")
+                        raise ValueError(f"Environment variable '{envname}' is not set or is empty. Please check your .env file or environment variables.")
                     else:
                         result[key] = value
                 else:

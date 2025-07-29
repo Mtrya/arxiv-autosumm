@@ -209,7 +209,8 @@ def get_default_model(provider: str) -> str:
         "moonshot": "kimi-k2-0711-preview",
         "minimax": "MiniMax-M1",
         "modelscope": "Qwen/Qwen3-235B-A22B-Thinking-2507",
-        "zhipu": "glm-4.5"
+        "zhipu": "glm-4.5",
+        "gemini": "gemini-2.5-pro"
     }
     return defaults.get(provider, "deepseek-reasoner")
 
@@ -225,7 +226,8 @@ def get_cheaper_model(provider: str) -> str:
         "moonshot": "kimi-latest",
         "minimax": "MiniMax-Text-01",
         "modelscope": "Qwen/Qwen2.5-7B-Instruct",
-        "zhipu": "glm-4.5-flash"
+        "zhipu": "glm-4.5-flash",
+        "gemini": "gemini-2.5-flash"
     }
     return cheaper_defaults.get(provider, "deepseek-chat")
 

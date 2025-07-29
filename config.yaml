@@ -7,12 +7,12 @@ run:
   - math.OC
   - astro-ph.EP
   - physics.space-ph
-  send_log: false
+  send_log: true
   log_dir: ./logs
 
 fetch:
   days: 8
-  max_results: 200
+  max_results: 7
   max_retries: 10
 
 summarize:
@@ -25,12 +25,13 @@ summarize:
   user_prompt_template: file:./prompts/summ_lm/user.md
   completion_options:
     temperature: 0.6
-  context_length: 131072
+    max_tokens: 256
+  context_length: 1000
 
 rate:
   strategy: llm
   top_k: 80
-  max_selected: 10
+  max_selected: 1
   embedder: null
   llm:
     provider: modelscope

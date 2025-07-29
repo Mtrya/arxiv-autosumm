@@ -237,6 +237,7 @@ def setup_logging(log_dir: str, send_log: bool, verbose: bool = False):
         log_file_path = os.path.join(log_dir, f"pipeline-run-{date.today().isoformat()}-{datetime.now().strftime('%H')}.txt")
         file_handler = logging.FileHandler(log_file_path)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        file_handler.stream = open(file_handler.baseFilename, 'a', buffering=1) # line buffering
         handlers.append(file_handler)
 
     logging.basicConfig(
@@ -254,21 +255,21 @@ def setup_logging(log_dir: str, send_log: bool, verbose: bool = False):
 
 def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[str]=None):
     """Main pipeline of ArXiv AutoSumm"""
-    logger, _ = setup_logging(log_dir=".", send_log=False, verbose=verbose)
     log_file_path = None
     config = {}
     
     try:
         # 0. Load and check configuration change
-        logger.info("Loading configuration...")
         config = MainConfig.from_yaml(config_path).get_pipeline_configs()
         logger, log_file_path = setup_logging(
             log_dir=config.get("log_dir","./logs"),
-            send_log=config.get("send_log",False)
+            send_log=config.get("send_log",False),
+            verbose=verbose
         )
+        logger.info("Configuration loaded successfully")
         cacher = Cacher(config["cache"])
         cacher.detect_and_handle_config_changes(config["rate"])
-        logger.info("Configuration loaded successfully")
+        logger.info("Cache handled successfully")
 
         # 1. Determine category to fetch
         today = date.today()
@@ -297,7 +298,7 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
             return
         
         # 4. Parse papers (coarse)
-        logger.info("Parsing papers (coarse)...")
+        logger.info("Parsing papers (coarse parsing with pdfminer)...")
         papers = parse_papers(papers, config["parse"], vlm=False, verbose=verbose)
         logger.info(f"Successfully parsed {len(papers)} papers")
         
@@ -330,7 +331,7 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
 
         # 11. Parse papers (fine)
         if config["parse"].enable_vlm:
-            logger.info("Parsing papers (fine with VLM)...")
+            logger.info("Parsing papers (fine parsing with VLM)...")
             papers = parse_papers(papers, config["parse"], vlm=True, batch_config=config["batch"], verbose=verbose)
             logger.info(f"Successfully refined {len(papers)} papers")
 
@@ -350,22 +351,34 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
         logger.info(f"Rendered summaries to {len(render_result)} formats")
 
         # 15. Deliver
-        logger.info("Delivering results...")
         paths = [r.path for r in render_result]
         if log_file_path:
             paths.append(log_file_path)
-        deliver(paths, config["deliver"], f"ArXiv Summary for {category}")
         logger.info("Pipeline completed successfully")
+        # Explicitly flush all logging handlers
+        for handler in logging.getLogger().handlers:
+            handler.flush()
+        logger.info("Delivering results...")
+        deliver(paths, config["deliver"], f"ArXiv Summary for {category}")
+        logger.info("Deliver completed")
+
+        # Explicitly flush all logging handlers
+        for handler in logging.getLogger().handlers:
+            handler.flush()
         
     except Exception as e:
         logger.error(f"Pipeline failed with error: {e}", exc_info=True) # always log exc_info when something went wrong
         if log_file_path and config.get("send_log"):
             try:
                 logger.info(f"Attempting to deliver error log: {log_file_path}")
+                for handler in logging.getLogger().handlers():
+                    handler.flush()
                 deliver([log_file_path],config["deliver"],"[ERROR] in ArXiv Summary Pipeline")
             except Exception as deliver_e:
                 logger.error(f"Failed to deliver error log: {deliver_e}", exc_info=verbose)
         raise
+    finally:
+        logging.shutdown()
 
 
 
