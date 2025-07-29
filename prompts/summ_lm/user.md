@@ -1,28 +1,41 @@
-Please help me understand the whole story of this research papers by offering a concise yet comprehensive summary.
+Please help me understand the complete story of this research paper by providing a concise yet comprehensive summary that captures both the forest and the trees.
 
-Present your insights in well-structured paragraphs using clear, plain English while retaining necessary technical terms.
+Present your insights in well-structured paragraphs using clear, plain English while appropriately retaining technical terms where precision matters.
 
-Here are some aspects you might consider exploring:
+Here's how I'd like you to approach the analysis:
 
-1. the core problem: what is the problem? are there any key concepts that require explanation?
-2. research context: how this work builds upon or challenges previous approaches?
-3. fundamental insights: what drives their approach?
-4. proposed solution: how does the solution address the problem?
-5. future horizons: any unexplored implications of their approach?
-6. potential weakness: are there any logical loophole or unreasonable deduction? (requires critical thinking)
+# Core Narrative Structure
 
-You might find it valuable to provide dual perspectives on key concepts or ideas:
-First, **Intuitive Understanding**: Offering metaphors or real-world parallels;
-Then, **Mathematical/Logical Framework**: Exploring the formal structure and reasoning.
+**Problem Definition**: What fundamental challenge does this work address? Are there key concepts or terminology that require careful explanation to understand the stakes?
 
-Here are some execution constraints:
+**Research Context**: How does this work build upon, extend, or challenge existing approaches in the field? What gaps in prior literature does it aim to fill?
 
-1. Use **structured paragraphs** rather than nested bullet points. (Use "First, ..., Second, ..." rather than bullet points like "- ..." or "1. ...". Never use over one layer of bullet points.)
-2. Anchor your analysis to specific paper sections.
-3. Avoid industry slang, you should use plain and approachable English.
-4. Use LaTeX math. (single dollar for inline math "$...$", and double dollar for displayed math "$$...$$")
-5. Use Markdown format. ("###" before subsections, "**...**" to highlight key concepts)
-6. Start directly with paper title and authors. (e.g., "# Attention Is All You Need\n...")
+**Driving Insights**: What core intuitions or breakthrough observations underpin their approach? What makes their perspective different?
+
+**Technical Solution**: How does their proposed method work? Walk me through the key mechanisms and design choices that address the core problem.
+
+**Critical Evaluation**: What are the approach's limitations, potential weaknesses, or unresolved questions? (This requires genuine critical thinking, not just surface-level criticism)
+
+# Dual Perspective Framework
+
+For key concepts, provide both:
+
+- **Intuitive Understanding**: Metaphors, analogies, or real-world parallels that make abstract ideas tangible
+- **Technical Precision**: Formal definitions, mathematical structures, or logical reasoning where needed
+
+# Execution Guidelines
+
+1. **Paragraph-driven structure**: Build narrative flow through connected paragraphs rather than isolated bullet points
+2. **Section anchoring**: Reference specific parts of the paper (e.g., "as described in Section 3.2...")
+3. **Plain language priority**: Avoid unnecessary jargon and explain technical terms when first introduced
+4. **Mathematical clarity**: Use LaTeX for precise notation (inline: $...$, displayed: $$...$$)
+5. **Markdown formatting**: Use ### for subsections, **bold** for key terms, *italics* for emphasis
+6. **Direct start**: Begin immediately with the paper's title and authors
+7. **Concise focus**: Keep total length under *2000* words — prioritize *depth and insight* over comprehensive coverage
+
+# Critical Thinking Standards
+
+Don't just summarize—analyze. Question assumptions. Identify logical gaps. Consider edge cases. Think about what happens when the method encounters scenarios beyond those tested. Connect these critiques to broader concepts or alternative techniques in the field — don't just focus on internal inconsistencies.
 
 Paper:
 

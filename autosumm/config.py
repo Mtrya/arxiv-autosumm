@@ -56,7 +56,8 @@ recognized_providers = {
     "moonshot": "https://api.moonshot.cn/v1",
     "siliconflow": "https://api.siliconflow.cn/v1",
     "volcengine": "https://ark.cn-beijing.volces.com/api/v3",
-    "modelscope": "https://api-inference.modelscope.cn/v1/"
+    "modelscope": "https://api-inference.modelscope.cn/v1/",
+    "zhipu": "https://open.bigmodel.cn/api/paas/v4"
 }
 
 valid_options = {
@@ -504,9 +505,12 @@ class PDFRenderConfig(BaseModel):
     margin: str="0.8in"
     colorlinks: bool=True
     link_color: str="RoyalBlue"
-    line_stretch: float=1.15
+    line_stretch: float=1.10
     pandoc_input_format: str="markdown+raw_tex+yaml_metadata_block"
     pandoc_from_format: str="gfm"
+    list_item_sep: str="0pt"
+    list_par_sep: str="0pt"
+    list_top_sep: str="6pt"
 
     def to_pipeline_config(self):
         return PDFRendererConfig_(
@@ -519,7 +523,10 @@ class PDFRenderConfig(BaseModel):
             link_color=self.link_color,
             line_stretch=self.line_stretch,
             pandoc_input_format=self.pandoc_input_format,
-            pandoc_from_format=self.pandoc_from_format
+            pandoc_from_format=self.pandoc_from_format,
+            list_item_sep=self.list_item_sep,
+            list_par_sep=self.list_par_sep,
+            list_top_sep=self.list_top_sep
         )
 
 class HTMLRendererConfig(BaseModel):

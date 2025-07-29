@@ -208,7 +208,8 @@ def get_default_model(provider: str) -> str:
         "ollama": "qwen3:32b",
         "moonshot": "kimi-k2-0711-preview",
         "minimax": "MiniMax-M1",
-        "modelscope": "Qwen/Qwen3-235B-A22B-Thinking-2507"
+        "modelscope": "Qwen/Qwen3-235B-A22B-Thinking-2507",
+        "zhipu": "glm-4.5"
     }
     return defaults.get(provider, "deepseek-reasoner")
 
@@ -223,7 +224,8 @@ def get_cheaper_model(provider: str) -> str:
         "ollama": "llama3.1:8b",
         "moonshot": "kimi-latest",
         "minimax": "MiniMax-Text-01",
-        "modelscope": "Qwen/Qwen2.5-7B-Instruct"
+        "modelscope": "Qwen/Qwen2.5-7B-Instruct",
+        "zhipu": "glm-4.5-flash"
     }
     return cheaper_defaults.get(provider, "deepseek-chat")
 

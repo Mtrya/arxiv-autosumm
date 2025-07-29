@@ -34,6 +34,9 @@ class PDFRendererConfig:
     line_stretch: float=1.10
     pandoc_input_format: str="markdown+raw_tex+yaml_metadata_block"
     pandoc_from_format: str="gfm"
+    list_item_sep: str="0pt"
+    list_par_sep: str="0pt"
+    list_top_sep: str="6pt"
 
 @dataclass
 class HTMLRendererConfig:
@@ -87,7 +90,7 @@ def _generate_base_filename(category: str, config: RendererConfig) -> str:
     category_clean = category.replace('.','')
 
     if config.base_filename:
-        return f"{config.base}_filename{current_year-2000:02d}{current_week_number:02d}"
+        return f"{config.base_filename}_{current_year-2000:02d}{current_week_number:02d}"
 
     return f"summary_{category_clean}_{current_year-2000:02d}{current_week_number:02d}"
 
@@ -171,6 +174,9 @@ def render_pdf(summaries: List[str], category, config: RendererConfig) -> Render
                     "--variable", f"documentclass={config.pdf.document_class}",
                     "--variable", f"geometry:margin={config.pdf.margin}",
                     "--variable", f"linestretch={config.pdf.line_stretch}",
+                    "--variable", f"itemsep={config.pdf.list_item_sep}",
+                    "--variable", f"parsep={config.pdf.list_par_sep}",
+                    "--variable", f"topsep={config.pdf.list_top_sep}",
                     "--from", config.pdf.pandoc_input_format
                 ]
                 

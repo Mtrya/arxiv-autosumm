@@ -4,7 +4,7 @@ Complete ArXiv-AutoSumm summarization workflow
 
 import os
 import logging
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, List
 from dataclasses import dataclass
 
@@ -234,7 +234,7 @@ def setup_logging(log_dir: str, send_log: bool, verbose: bool = False):
 
     if send_log:
         os.makedirs(log_dir, exist_ok=True)
-        log_file_path = os.path.join(log_dir, f"pipeline-run-{date.today()}.log")
+        log_file_path = os.path.join(log_dir, f"pipeline-run-{date.today().isoformat()}-{datetime.now().strftime('%H')}.txt")
         file_handler = logging.FileHandler(log_file_path)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         handlers.append(file_handler)

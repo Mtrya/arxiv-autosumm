@@ -108,6 +108,9 @@ render:
     line_stretch: 1.10
     pandoc_input_format: "markdown+raw_tex+yaml_metadata_block"
     pandoc_from_format: gfm
+    list_item_sep: 0pt
+    list_par_sep: 0pt
+    list_top_sep: 6pt
   html:
     math_renderer: mathjax
     mathjax_url: null
