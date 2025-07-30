@@ -12,3 +12,5 @@ CLAUDE.md
 *.egg-info
 .env
 logs
+PLAN.md
+cache

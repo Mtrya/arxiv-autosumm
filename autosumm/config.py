@@ -481,7 +481,7 @@ class BatchConfig(BaseModel):
         )
 
 class CacherConfig(BaseModel):
-    dir: str="~/.cache/arxiv-autosumm"
+    dir: str="./cache"
     ttl_days: int=16
 
     def to_pipeline_config(self):

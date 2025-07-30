@@ -30,7 +30,7 @@ class Cacher:
         # Database path only - no summary files directory
         self.db_path = self.cache_dir / "cache.db"
         
-        logger.info(f"Initializing cache at {self.db_path}")
+        logger.info(f"Initializing cacher at {self.db_path}")
         logger.info(f"Cache TTL: {config.ttl_days} days")
         
         # Initialize database

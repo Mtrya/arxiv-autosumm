@@ -1,0 +1,47 @@
+# .dockerignore
+# Build artifacts and temporary files
+__pycache__/
+*.egg-info/
+*.egg
+test_output/
+
+# IDE and editor files
+.vscode/
+*.md
+.claude/
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+
+# Test files
+tests/
+test_*/
+*_test.py
+
+# Docker build context exclusions
+docker/prebuilt-setup.*
+docker/local-setup.*
+docker/Dockerfile
+docker/docker-compose.yaml
+
+# Large files that shouldn't be in container
+*.pdf
+*.epub
+*.md
+*.html
+*.azw3
+
+# Handled by volume or unused
+# prompts/ leave prompts/ as default prompts
+output/
+logs/
+assets/
+docs/
+tmp/
+cache/
+temp/
+*.yaml
+.env

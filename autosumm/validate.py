@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import requests
 
 from .pipeline import (
-    summarize, parse_vlm, rate_llm, rate_embed
+    fetch, parse_fast, parse_vlm, rate_embed, rate_llm, render, summarize
 )
 
 from .config import MainConfig
@@ -356,7 +356,8 @@ class ConfigValidator:
                 details={"model": parse_config.vlm.model}
             )
 
-
+# TODO: More comprehensive tests to cover the entire pipeline
+# TODO: Friendlier error prompts
 
 if __name__ == "__main__":
     import sys

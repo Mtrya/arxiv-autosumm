@@ -115,7 +115,11 @@ def select_papers_embed(papers: List[PaperMetadata], cacher: Cacher, rate_config
                 if result.success:
                     paper.embed_score = result.score
                     papers_with_score.append(paper)
-                    cacher.store_similarity_score(paper.arxiv_id, paper.embed_score)
+                    try:
+                        cacher.store_similarity_score(paper.arxiv_id, paper.embed_score)
+                    except Exception as e:
+                        if verbose:
+                            logger.debug(f"Failed to cache similarity score for {paper.arxiv_id}: {e}")
                     if verbose:
                         logger.debug(f"rate_embed for {paper.arxiv_id} success: {result.score}")
                 else:
@@ -159,7 +163,11 @@ def select_papers_llm(papers: List[PaperMetadata], cacher: Cacher, rate_config, 
                 if result.success:
                     paper.llm_score = result.score
                     papers_with_score.append(paper)
-                    cacher.store_rating_score(paper.arxiv_id, paper.llm_score, {})
+                    try:
+                        cacher.store_rating_score(paper.arxiv_id, paper.llm_score, {})
+                    except Exception as e:
+                        if verbose:
+                            logger.debug(f"Failed to cache llm rating score for {paper.arxiv_id}: {e}")
                     if verbose:
                         logger.debug(f"rate_llm for {paper.arxiv_id} succeeded: {result.score}")
                 else:
@@ -213,7 +221,11 @@ def summarize_paper(papers: List[PaperMetadata], cacher: Cacher, summarize_confi
                 continue
             
             renderable_papers.append(paper)
-            cacher.mark_paper_processed(paper.arxiv_id, {})
+            try:
+                cacher.mark_paper_processed(paper.arxiv_id, {})
+            except Exception as e:
+                if verbose:
+                    logger.debug(f"Failed to mark {paper.arxiv_id} as processed: {e}")
             if verbose:
                 logger.debug(f"Successfully prepared summary for {paper.arxiv_id}")
         
@@ -237,7 +249,6 @@ def setup_logging(log_dir: str, send_log: bool, verbose: bool = False):
         log_file_path = os.path.join(log_dir, f"pipeline-run-{date.today().isoformat()}-{datetime.now().strftime('%H')}.txt")
         file_handler = logging.FileHandler(log_file_path)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        file_handler.stream = open(file_handler.baseFilename, 'a', buffering=1) # line buffering
         handlers.append(file_handler)
 
     logging.basicConfig(
@@ -268,8 +279,11 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
         )
         logger.info("Configuration loaded successfully")
         cacher = Cacher(config["cache"])
-        cacher.detect_and_handle_config_changes(config["rate"])
-        logger.info("Cache handled successfully")
+        try:
+            cacher.detect_and_handle_config_changes(config["rate"])
+            logger.info("Cache handled successfully")
+        except Exception as e:
+            logger.warning(f"Cache operation failed: {e}")
 
         # 1. Determine category to fetch
         today = date.today()
@@ -312,7 +326,8 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
             papers = select_papers_embed(papers, cacher, config["rate"], config["batch"], verbose=verbose)
             logger.info(f"Selected {len(papers)} papers after embedding rating")
         else:
-            logger.info(f"Skipping embedder rating (using strategy [{config["rate"].strategy}])")
+            strategy = config["rate"].strategy
+            logger.info(f"Skipping embedder rating (using strategy `{strategy}`)")
 
         # 8&9&10. Rate papers (with llm) + cache llm ratings + select max_selected papers to summarize
         if config["rate"].strategy in ["llm","hybrid"]:
