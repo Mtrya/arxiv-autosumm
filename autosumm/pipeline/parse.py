@@ -5,16 +5,16 @@ PDF parsing functionalities with fast and high-quality modes.
 import os
 import re
 import requests
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 import fitz
 import base64
-from arxiv2text import arxiv_to_md
+from pdfminer.high_level import extract_text
+from pdfminer.layout import LAParams
+import io
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import shutil
-import uuid
 
 try:
     from client import BaseClient, BatchConfig
@@ -247,96 +247,107 @@ def parse_vlm(pdf_urls: List[str], config: ParserConfig, batch_config: Optional[
     return results
 
 def _parse_fast_single(pdf_url: str, config: ParserConfig, pdf_index: int) -> ParseResult:
-    """Helper function to parse a single PDF in an isolated directory"""
+    """
+    Helper function to parse a single PDF in an isolated directory
+    Downloads the PDF (if URL), extracts text using pdfminer, and cleans it up
+    """
 
-    # Crete a unique temp dir for this job to avoid race conditions
-    job_tmp_dir = Path(config.tmp_dir) / f"fast_parse_{pdf_index}_{uuid.uuid4()}"
-    job_tmp_dir.mkdir(parents=True,exist_ok=True)
+    # Uses the same logic in arxiv2text, but with timeout for requests, and perform PDF processing in-memory
+    # Time out actively to prevent never-finished job
+    # Although timing out most hanging jobs, some still escape due to unknown-reasons
 
     try:
         logger.debug(f"Processing PDF {pdf_index+1} ({pdf_url}) in worker {os.getpid()}")
 
-        arxiv_to_md(pdf_url, str(job_tmp_dir))
+        content = ""
+        if pdf_url.startswith(('http://','https://')):
+            response = requests.get(pdf_url,timeout=config.fast_parser_timeout_seconds)
+            response.raise_for_status()
+            with io.BytesIO(response.content) as pdf_stream:
+                content = extract_text(pdf_stream, laparams=LAParams())
+        else:
+            with open(pdf_url, 'rb') as pdf_file:
+                content = extract_text(pdf_file, laparams=LAParams)
 
-        generated_files = [f for f in os.listdir(job_tmp_dir) if f.endswith('.md')]
-        if not generated_files:
-            raise ValueError("arxiv2text did not produce a markdown file.")
-        md_file_path = job_tmp_dir / generated_files[0]
-
-        with open(md_file_path,'r',encoding='utf-8') as file:
-            content = file.read()
-
-        # Remove inappropriate line breaks within paragraphs
+        # Remove inappropriate line breaks within paragraphs to form coherent sentences.
         content = re.sub(r'(?<!\n)\n(?!\n)', ' ', content)
         
-        # Remove content after "References" or "REFERENCES"
-        match = re.search(r'\nReferences\n|\nREFERENCES\n', content)
+        # Remove content after "References" or "REFERENCES" to focus on the main body.
+        match = re.search(r'\n\s*(References|REFERENCES)\s*\n', content)
         if match:
             content = content[:match.start()]
-        
-        logger.debug(f"Successfully parsed PDF {pdf_index+1}")
+
+        logger.debug(f"Successfully parsed PDF {pdf_index+1} ({pdf_url})")
         return ParseResult(
-            content=content,
+            content = content.strip(),
             success=True,
+            error=None,
             method="fast"
         )
-    
-    except Exception as e:
-        logger.error(f"Failed to parse PDF {pdf_index+1} ({pdf_url}): {e}")
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout when downloading PDF {pdf_index+1} ({pdf_url})")
         return ParseResult(
             content="",
             success=False,
-            error=str(e),
+            error=f"Download timed out after {config.fast_parser_timeout_seconds} seconds",
             method="fast"
         )
-    finally:
-        # Clean up the temporary job directory
-        if job_tmp_dir.exists():
-            shutil.rmtree(job_tmp_dir)
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to download PDF {pdf_index+1} ({pdf_url}): {e}")
+        return ParseResult(
+            content="",
+            success=False,
+            error=f"Parsing failed: {e}",
+            method="fast"
+        )
+            
 
 def parse_fast(pdf_urls: List[str], config: ParserConfig) -> List[ParseResult]:
     """
-    Fast parsing using arxiv2text for rating phase.
-    Uses multithreading to accelerate PDF parsing.
+    Fast parsing using requests and pdfminer.
+    Uses multithreading to accelerate PDF parsing. Results are returned in the same order as the input pdf_urls.
     """
     logger.info(f"Starting fast parsing for {len(pdf_urls)} PDFs using multithreading")
 
-    results = []
+    results = [None] * len(pdf_urls)
 
     with ThreadPoolExecutor() as executor:
         # Submit all tasks
-        future_to_url = {
-            executor.submit(_parse_fast_single, url, config, i): url
+        future_to_index = {
+            executor.submit(_parse_fast_single, url, config, i): i
             for i, url in enumerate(pdf_urls)
         }
 
-        # Collect results as they complete
-        for future in as_completed(future_to_url):
-            pdf_url = future_to_url[future]
+        # Collect results as they complete and place them in the correct spot
+        for future in as_completed(future_to_index):
+            index = future_to_index[future]
+            pdf_url = pdf_urls[index]
             try:
+                # Add a per-job timeout as a safeguard against hanging parsers
                 result = future.result(timeout=config.fast_parser_timeout_seconds)
-                results.append(result)
+                results[index] = result
             except TimeoutError:
                 logger.warning(f"Parsing timed out for PDF: {pdf_url}")
-                results.append(ParseResult(
+                results[index] = ParseResult(
                     content="",
                     success=False,
                     error=f"Parsing timed out after {config.fast_parser_timeout_seconds} seconds.",
                     method="fast"
-                ))
+                )
             except Exception as e:
                 logger.error(f"An unexpected error occurred while parsing PDF {pdf_url}: {e}")
-                results.append(ParseResult(
+                results[index] = ParseResult(
                     content="",
                     success=False,
                     error=f"An unexpected error occurred: {e}",
                     method="fast"
-                ))
+                )
     
-    logger.info(f"Fast parsing completed: {len([r for r in results if r.success])} successful, {len([r for r in results if not r.success])} failed")
+    successful_count = sum(1 for r in results if r and r.success)
+    failed_count = len(results) - successful_count
+    logger.info(f"Fast parsing completed: {successful_count} successful, {failed_count} failed")
         
     return results
-
     
 
 if __name__ == "__main__":

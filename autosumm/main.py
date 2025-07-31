@@ -4,6 +4,7 @@ Complete ArXiv-AutoSumm summarization workflow
 
 import os
 import logging
+import shutil
 from datetime import date, datetime
 from typing import Optional, List
 from dataclasses import dataclass
@@ -393,6 +394,13 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
                 logger.error(f"Failed to deliver error log: {deliver_e}", exc_info=verbose)
         raise
     finally:
+        # Clean up tmp directory
+        tmp_dir = config["parse"].tmp_dir
+        if os.path.exists(tmp_dir) and os.path.isdir(tmp_dir):
+            try:
+                shutil.rmtree(tmp_dir)
+            except Exception as cleanup_e:
+                pass
         logging.shutdown()
 
 
