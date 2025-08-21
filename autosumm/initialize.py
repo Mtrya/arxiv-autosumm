@@ -99,79 +99,81 @@ def select_categories_interactively() -> List[str]:
     
     return valid_categories
 
-
 def configure_llm_providers() -> Dict[str, any]:
     """Configure LLM providers for summarization and rating."""
     typer.echo("\n🤖 Configure LLM Provider")
     typer.echo("=" * 60)
-    
-    # Provider selection
-    providers = list(recognized_providers.keys())
+
+    # Provider selection (alphabetical from recognized_providers)
+    providers = sorted(recognized_providers.keys())
     typer.echo("Default providers:")
     for i, provider in enumerate(providers, 1):
         typer.echo(f"{i}. {provider}")
-    
-    provider_idx = typer.prompt("Select provider number (enter 0 to choose custom provider)", type=int)
+
+    provider_idx = typer.prompt("Select provider number (enter 0 to choose a custom provider)", type=int)
     if 1 <= provider_idx <= len(providers):
         provider = providers[provider_idx - 1]
     else:
         provider = typer.prompt("Enter custom provider name (Optional)")
-    
-    base_url = recognized_providers.get(provider, "")
+
+    base_url = ""
+    if provider in recognized_providers:
+        base_url = recognized_providers[provider]["base_url"]
     if not base_url:
         base_url = typer.prompt("Enter API base URL")
-    
+
     # API key (not needed for local providers)
     is_local = provider == "ollama" or "localhost" in base_url
     api_key = None
     if not is_local:
-        api_key = get_interactive_input("Enter API key directly or use env:VARIABLE_NAME (e.g., 'sk-123456' or 'env:OPENAI_API_KEY')", password=False)
-    
+        api_key = get_interactive_input(
+            "Enter API key directly or use env:VARIABLE_NAME (e.g., 'sk-123456' or 'env:OPENAI_API_KEY')",
+            password=False
+        )
+
     # Model selection for summarization
-    model = typer.prompt("Enter model name for summarization", default=get_default_model(provider))
-    
+    model = typer.prompt("Enter model name for summarization", default=get_summarizer_model(provider))
+
     # Rater LLM configuration
     typer.echo("\n📊 Configure Rater LLM (for initial paper filtering)")
     typer.echo("This can be a cheaper/faster model to reduce costs when processing many papers.")
-    
+
     use_separate_rater = typer.confirm("Use a separate model for rating?", default=True)
-    
+
     rater_provider = provider
     rater_base_url = base_url
     rater_api_key = api_key
     rater_model = model
-    
+
     if use_separate_rater:
         typer.echo("\nConfigure rater LLM:")
         same_as_summarizer = typer.confirm("Use same provider as summarizer?", default=True)
-        
+
         if not same_as_summarizer:
-            # Provider selection for rater
             typer.echo("Available providers:")
-            for i, provider in enumerate(providers, 1):
-                typer.echo(f"{i}. {provider}")
-            
-            rater_provider_idx = typer.prompt("Select rater provider number (enter 0 to chooses custom provider)", type=int)
+            for i, p in enumerate(providers, 1):
+                typer.echo(f"{i}. {p}")
+
+            rater_provider_idx = typer.prompt("Select rater provider number (enter 0 to choose a custom provider)", type=int)
             if 1 <= rater_provider_idx <= len(providers):
                 rater_provider = providers[rater_provider_idx - 1]
             else:
                 rater_provider = typer.prompt("Enter custom rater provider name (Optional)")
-            
-            rater_base_url = recognized_providers.get(rater_provider, "")
+
+            rater_base_url = recognized_providers.get(rater_provider, {}).get("base_url", "")
             if not rater_base_url:
                 rater_base_url = typer.prompt("Enter rater API base URL")
-            
+
             rater_is_local = rater_provider == "ollama" or "localhost" in rater_base_url
             rater_api_key = None
             if not rater_is_local:
-                rater_api_key = get_interactive_input("Enter rater API key directly or use env:VARIABLE_NAME (e.g., 'sk-123456' or 'env:OPENAI_API_KEY')", password=False)
-        
-        # Model selection for rater
-        rater_model = typer.prompt(
-            "Enter model name for rating", 
-            default=get_cheaper_model(rater_provider)
-        )
-    
+                rater_api_key = get_interactive_input(
+                    "Enter rater API key directly or use env:VARIABLE_NAME (e.g., 'sk-123456' or 'env:OPENAI_API_KEY')",
+                    password=False
+                )
+
+        rater_model = typer.prompt("Enter model name for rating", default=get_rater_model(rater_provider))
+
     # Basic validation only - no connectivity test
     try:
         provider, base_url, api_key = validate_api_config(provider, base_url, api_key)
@@ -184,7 +186,7 @@ def configure_llm_providers() -> Dict[str, any]:
         typer.echo(f"❌ Configuration validation failed: {e}")
         if not typer.confirm("Continue anyway?"):
             raise typer.Exit(1)
-    
+
     return {
         "provider": provider,
         "base_url": base_url,
@@ -197,39 +199,31 @@ def configure_llm_providers() -> Dict[str, any]:
         "use_separate_rater": use_separate_rater
     }
 
-
-def get_default_model(provider: str) -> str:
-    """Get default model for provider."""
-    defaults = {
-        "openai": "gpt-4o",
-        "deepseek": "deepseek-reasoner",
-        "siliconflow": "deepseek-ai/DeepSeek-R1",
-        "dashscope": "qwen-plus",
-        "ollama": "qwen3:32b",
-        "moonshot": "kimi-k2-0711-preview",
-        "minimax": "MiniMax-M1",
-        "modelscope": "Qwen/Qwen3-235B-A22B-Thinking-2507",
-        "zhipu": "glm-4.5",
-        "gemini": "gemini-2.5-pro"
+def get_summarizer_model(provider: str) -> str:
+    """Get intelligent summarizer model"""
+    p = provider.lower() if provider else ""
+    if p in recognized_providers:
+        return recognized_providers[p].get("default_summarizer") \
+            or recognized_providers[p].get("default_rater") \
+            or "deepseek-reasoner"
+    
+    fallback = {
+        "": "deepseek-reasoner"
     }
-    return defaults.get(provider, "deepseek-reasoner")
+    return fallback.get(p, "deepseek-reasoner")
 
-
-def get_cheaper_model(provider: str) -> str:
-    """Get cheaper/faster model for provider (used for rating)."""
-    cheaper_defaults = {
-        "openai": "gpt-4o-mini",
-        "deepseek": "deepseek-chat",
-        "siliconflow": "THUDM/glm-4-9b-chat",
-        "dashscope": "qwen-turbo",
-        "ollama": "llama3.1:8b",
-        "moonshot": "kimi-latest",
-        "minimax": "MiniMax-Text-01",
-        "modelscope": "Qwen/Qwen2.5-7B-Instruct",
-        "zhipu": "glm-4.5-flash",
-        "gemini": "gemini-2.5-flash"
+def get_rater_model(provider: str) -> str:
+    """Get fast&cheap rater model"""
+    p = provider.lower() if provider else ""
+    if p in recognized_providers:
+        return recognized_providers[p].get("default_rater") \
+            or recognized_providers[p].get("default_summarizer") \
+            or "deepseek-chat"
+    
+    fallback = {
+        "": "deepseek-chat"
     }
-    return cheaper_defaults.get(provider, "deepseek-chat")
+    return fallback.get(p, "deepseek-chat")
 
 
 def configure_categories() -> Dict[str, any]:
@@ -260,7 +254,7 @@ def configure_email() -> Dict[str, any]:
     for i, provider in enumerate(providers.keys(), 1):
         typer.echo(f"{i}. {provider.title()}")
     
-    provider_choice = typer.prompt("Select provider (Enter 0 to choose custom provider)", type=int, default=1)
+    provider_choice = typer.prompt("Select provider (Enter 0 to choose a custom provider)", type=int, default=1)
     
     if 1 <= provider_choice <= len(providers):
         provider = list(providers.keys())[provider_choice - 1]

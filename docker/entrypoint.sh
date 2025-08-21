@@ -1,7 +1,22 @@
 #!/bin/bash
-# ./docker/entrypoint.sh
-
 set -e
+
+# ... existing color definitions ...
+
+# Debug: Show environment and process info
+echo "--- ENVIRONMENT ---"
+env
+echo "--- PROCESS TREE ---"
+ps faux
+echo "--- PATH ---"
+echo $PATH
+echo "--- COMMAND LOCATION ---"
+which autosumm || echo "autosumm not found in PATH"
+
+command="$1"
+
+# Debug: Show received command
+echo "Received command: '$command' with args: '${@:2}'"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -34,16 +49,32 @@ case "$command" in
   run-app)
     echo "Starting the main application..."
     shift
-    exec autosumm run "$@"
+    # Debug: Show what command will be executed
+    echo "Executing: autosumm run $@"
+    # Debug: Verify the command exists
+    if ! command -v autosumm &> /dev/null; then
+      log_error "autosumm command not found in PATH!"
+      exit 1
+    fi
+    # Execute with debug output
+    set -x  # Enable command tracing
+    autosumm run "$@"
+    status=$?
+    set +x  # Disable command tracing
+    if [ $status -ne 0 ]; then
+      log_error "Main application failed with exit code $status"
+      log_warning "Container will remain running for debugging"
+      sleep infinity
+    fi
     ;;
     # Run the main pipeline using:
     # ``` docker run --rm arxiv-autosumm:latest ```
     # Or ``` docker run --rm arxiv-autosumm:latest run-app --verbose --specify-category cs.AI ```
     # With docker-compose, just:
-    # ``` docker-compose up``` (foreground) or ``` docker-compose up -d``` (background)
+    # ``` docker-compose -f docker/docker-compose.yml up``` (foreground)
     # Add other pipeline arguments normally after `docker-compose up`
 
-  run_tests)
+  run-tests)
     echo "Running tests..."
     shift
     exec autosumm test-config "$@"
@@ -52,7 +83,7 @@ case "$command" in
   *)
     # If the command is not recognized, show an error.
     echo "Error: Unknown command '$command'"
-    echo "Available commands: run_app, run_tests"
+    echo "Available commands: run-app, run-tests"
     exit 1
     ;;
     # To run the tests:

@@ -35,7 +35,7 @@ For key concepts, provide both:
 
 # Critical Thinking Standards
 
-Don't just summarize. Analyze and connect. Question assumptions. Identify logical gaps. Think about what happens when the method encounters scenarios beyond those tested. Connect these critiques to broader concepts or alternative techniques in the field.
+Don't just summarize. Analyze, connect and brainstorm. Question assumptions. Identify logical gaps. Connect these critiques to broader concepts or alternative techniques in the field.
 
 Paper:
 
