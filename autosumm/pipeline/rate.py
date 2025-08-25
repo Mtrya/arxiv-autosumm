@@ -339,7 +339,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
 def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Optional[BatchConfig]=None) -> List[RateResult]:
     """Rate multiple papers using batch processing when configured"""
     logger.info(f"Starting LLM-based rating for {len(parsed_contents)} papers (batch={getattr(config.llm, 'batch', False)})")
-    if not getattr(config, 'batch', False):
+    if not getattr(config.llm, 'batch', False):
         client = RaterLLMClient(config.llm,batch_config)
         results = [client.process_single(content) for content in parsed_contents]
         final_results = [
@@ -350,7 +350,7 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
                 method="llm_single"
             ) for result in results
         ]
-        logger.info(f"Single LLM rating completed: {len([r for r in final_results if r.success])} successful")
+        logger.info(f"LLM rating completed: {len([r for r in final_results if r.success])} successful")
         return final_results
 
     try:
@@ -365,7 +365,7 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
                 method="llm_batch"
             ) for result in results
         ]
-        logger.info(f"Batch LLM rating completed: {len([r for r in final_results if r.success])} successful")
+        logger.info(f"LLM rating completed: {len([r for r in final_results if r.success])} successful")
         return final_results
 
     except Exception as e:

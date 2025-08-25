@@ -30,13 +30,15 @@ For key concepts, provide both:
 3. **Plain language priority**: Avoid unnecessary jargon and explain technical terms when first introduced
 4. **Mathematical clarity**: Use LaTeX for precise notation (inline: $...$, displayed: $$...$$)
 5. **Markdown formatting**: Use ### for subsections, **bold** for key terms, *italics* for emphasis
-6. **Direct start**: Begin immediately with the paper's title, authors (just names, no superscripts or subscripts, for they may disrupt markdown render) and github link (if any)
-7. **Concise focus**: Keep total length under *1250* words — prioritize *depth and insight* over comprehensive coverage
+6. **Direct start**: Begin *immediately* with the paper's title, authors (just names, no superscripts or subscripts, for they may disrupt markdown render) and github link (if any). Don't add any other descriptions or greetings
+7. **Concise focus**: Keep total length under *800* words — prioritize *depth and insight* over comprehensive coverage
 
 # Critical Thinking Standards
 
-Don't just summarize. Analyze, connect and brainstorm. Question assumptions. Identify logical gaps. Connect these critiques to broader concepts or alternative techniques in the field.
+Don't just summarize. Analyze, connect and brainstorm. Question assumptions. Identify logical gaps. Connect these critiques to broader concepts and adjacent techniques.
 
 Paper:
 
+```
 {paper_content}
+```
