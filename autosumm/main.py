@@ -247,7 +247,7 @@ def setup_logging(log_dir: str, send_log: bool, verbose: bool = False):
 
     if send_log:
         os.makedirs(log_dir, exist_ok=True)
-        log_file_path = os.path.join(log_dir, f"pipeline-run-{date.today().isoformat()}-{datetime.now().strftime('%H')}.txt")
+        log_file_path = os.path.join(log_dir, f"run-{date.today().isoformat()}-{datetime.now().strftime('%H')}.txt")
         file_handler = logging.FileHandler(log_file_path)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         handlers.append(file_handler)
@@ -310,6 +310,8 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
         
         if not papers:
             logger.info("No new papers found, exiting pipeline")
+            if log_file_path:
+                deliver([log_file_path], config[deliver])
             return
         
         # 4. Parse papers (coarse)
@@ -319,6 +321,8 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
         
         if not papers:
             logger.warning("No papers could be parsed, exiting pipeline")
+            if log_file_path:
+                deliver([log_file_path], config[deliver])
             return
 
         # 5&6&7. Rate papers (with embedder) + cache embedder ratings + select top-k papers
@@ -343,6 +347,8 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
 
         if not papers:
             logger.warning("No papers selected for summarization, exiting pipeline")
+            if log_file_path:
+                deliver([log_file_path], config[deliver])
             return
 
         # 11. Parse papers (fine)
@@ -358,6 +364,8 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
 
         if not papers:
             logger.warning("No papers could be summarized, exiting pipeline")
+            if log_file_path:
+                deliver([log_file_path], config[deliver])
             return
 
         # 14. Render
