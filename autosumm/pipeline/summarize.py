@@ -127,7 +127,7 @@ def summarize(parsed_contents: List[str], config: SummarizerConfig, batch_config
         return final_results
         
     except Exception as e:
-        logger.error(f"Summarization failed: {e}")
+        logger.error(f"Summarization failed: {e}",exc_info=True)
         return [
             SummaryResult(
                 content="",

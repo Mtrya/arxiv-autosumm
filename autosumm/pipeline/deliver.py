@@ -209,7 +209,7 @@ def deliver(file_paths: List[str], config: DelivererConfig, subject: Optional[st
         
     except Exception as e:
         error_msg = f"Failed to send email: {str(e)}"
-        logger.error(error_msg)
+        logger.error(error_msg,exc_info=True)
         print(f"Error: {error_msg}")
         
         return DeliveryResult(

@@ -675,7 +675,7 @@ def render(summaries: List[str], category: str, config: RendererConfig) -> List[
         elif format_name == "azw3":
             result = render_azw3(summaries, category, config)
         else:
-            logger.error(f"Unsupported format requested: {format_name}")
+            logger.error(f"Unsupported format requested: {format_name}",exc_info=True)
             result = RenderResult(
                 path="",
                 format=format_name,

@@ -73,7 +73,7 @@ def fetch(category: str, config: FetcherConfig) -> List[FetchResult]:
             logger.warning(f"Attempt {attempt+1} failed: {e}")
             time.sleep(5)
     else:
-        logger.error("Max retries reached. Failed to fetch papers.")
+        logger.error("Max retries reached. Failed to fetch papers.",exc_info=True)
         raise RuntimeError("Failed to fetch papers after maximum retries.")
     
     return papers

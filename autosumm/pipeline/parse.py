@@ -99,7 +99,7 @@ def _pdf_to_images(pdf_url: str, pdf_index: int, config: ParserVLMConfig, tmp_di
             pdf_path.unlink(missing_ok=True)
             
     except Exception as e:
-        logger.error(f"Error converting PDF {pdf_index} to images: {e}")
+        logger.error(f"Error converting PDF {pdf_index} to images: {e}",exc_info=True)
         return []
     
     return image_data_list
@@ -285,7 +285,7 @@ def _parse_fast_single(pdf_url: str, config: ParserConfig, pdf_index: int) -> Pa
             method="fast"
         )
     except requests.exceptions.Timeout:
-        logger.error(f"Timeout when downloading PDF {pdf_index+1} ({pdf_url})")
+        logger.error(f"Timeout when downloading PDF {pdf_index+1} ({pdf_url})",exc_info=True)
         return ParseResult(
             content="",
             success=False,
@@ -293,7 +293,7 @@ def _parse_fast_single(pdf_url: str, config: ParserConfig, pdf_index: int) -> Pa
             method="fast"
         )
     except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to download PDF {pdf_index+1} ({pdf_url}): {e}")
+        logger.error(f"Failed to download PDF {pdf_index+1} ({pdf_url}): {e}",exc_info=True)
         return ParseResult(
             content="",
             success=False,
@@ -335,7 +335,7 @@ def parse_fast(pdf_urls: List[str], config: ParserConfig) -> List[ParseResult]:
                     method="fast"
                 )
             except Exception as e:
-                logger.error(f"An unexpected error occurred while parsing PDF {pdf_url}: {e}")
+                logger.error(f"An unexpected error occurred while parsing PDF {pdf_url}: {e}",exc_info=True)
                 results[index] = ParseResult(
                     content="",
                     success=False,

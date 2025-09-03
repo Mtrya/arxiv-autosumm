@@ -325,7 +325,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
             ))
             
         except Exception as e:
-            logger.error(f"Embedding rating failed: {e}")
+            logger.error(f"Embedding rating failed: {e}",exc_info=True)
             results.append(RateResult(
                 score=0.0,
                 success=False,
