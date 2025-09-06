@@ -9,7 +9,7 @@ description = "A pipeline for fetching and summarizing academic papers."
 authors = [
   { name="Mtrya", email="kaupane20@yeah.net" },
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 readme = "README.md"
 license = "MIT"
 classifiers = [

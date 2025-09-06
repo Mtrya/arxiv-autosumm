@@ -285,7 +285,7 @@ def _parse_fast_single(pdf_url: str, config: ParserConfig, pdf_index: int) -> Pa
             method="fast"
         )
     except requests.exceptions.Timeout:
-        logger.error(f"Timeout when downloading PDF {pdf_index+1} ({pdf_url})",exc_info=True)
+        logger.error(f"Timeout when downloading PDF {pdf_index+1} ({pdf_url})")
         return ParseResult(
             content="",
             success=False,
@@ -293,7 +293,7 @@ def _parse_fast_single(pdf_url: str, config: ParserConfig, pdf_index: int) -> Pa
             method="fast"
         )
     except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to download PDF {pdf_index+1} ({pdf_url}): {e}",exc_info=True)
+        logger.error(f"Failed to download PDF {pdf_index+1} ({pdf_url}): {e}")
         return ParseResult(
             content="",
             success=False,
@@ -335,7 +335,7 @@ def parse_fast(pdf_urls: List[str], config: ParserConfig) -> List[ParseResult]:
                     method="fast"
                 )
             except Exception as e:
-                logger.error(f"An unexpected error occurred while parsing PDF {pdf_url}: {e}",exc_info=True)
+                logger.error(f"An unexpected error occurred while parsing PDF {pdf_url}: {e}")
                 results[index] = ParseResult(
                     content="",
                     success=False,
