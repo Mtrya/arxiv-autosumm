@@ -81,16 +81,15 @@ class RenderResult:
 def _generate_base_filename(category: str, config: RendererConfig) -> str:
     """Generate base filename"""
     now = datetime.now()
-    iso_calender = now.isocalendar()
-    current_year = iso_calender.year
-    current_week_number = iso_calender.week
 
     category_clean = category.replace('.','')
 
-    if config.base_filename:
-        return f"{config.base_filename}_{current_year-2000:02d}{current_week_number:02d}"
+    date_str = now.strftime("%y%m%d")
 
-    return f"summary_{category_clean}_{current_year-2000:02d}{current_week_number:02d}"
+    if config.base_filename:
+        return f"{config.base_filename}_{date_str}"
+
+    return f"summary_{category_clean}_{date_str}"
 
 def _ensure_output_dir(output_dir: str) -> Path:
     """Ensure output directory exists and return Path object"""
