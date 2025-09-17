@@ -383,7 +383,8 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
         for handler in logging.getLogger().handlers:
             handler.flush()
         logger.info("Delivering results...")
-        deliver(paths, config["deliver"], f"ArXiv Summary for {category}")
+        summarizer_model = config["summarize"].model
+        deliver(paths, config["deliver"], f"ArXiv Summary for {category}", summarizer_model)
         logger.info("Deliver completed")
 
         # Explicitly flush all logging handlers
@@ -391,16 +392,19 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
             handler.flush()
         
     except Exception as e:
-        logger.error(f"Pipeline failed with error: {e}", exc_info=True) # always log exc_info when something went wrong
-        if log_file_path and config.get("send_log"):
-            try:
-                logger.info(f"Attempting to deliver error log: {log_file_path}")
-                for handler in logging.getLogger().handlers():
-                    handler.flush()
-                deliver([log_file_path],config["deliver"],"[ERROR] in ArXiv Summary Pipeline")
-            except Exception as deliver_e:
-                logger.error(f"Failed to deliver error log: {deliver_e}", exc_info=verbose)
-        raise
+        if 'logger' in locals():
+            logger.error(f"Pipeline failed with error: {e}", exc_info=True) # always log exc_info when something went wrong
+            if log_file_path and config.get("send_log"):
+                try:
+                    logger.info(f"Attempting to deliver error log: {log_file_path}")
+                    for handler in logging.getLogger().handlers():
+                        handler.flush()
+                    deliver([log_file_path],config["deliver"],"[ERROR] in ArXiv Summary Pipeline")
+                except Exception as deliver_e:
+                    logger.error(f"Failed to deliver error log: {deliver_e}", exc_info=verbose)
+            raise
+        else:
+            raise
     finally:
         # Clean up tmp directory
         tmp_dir = config["parse"].tmp_dir
