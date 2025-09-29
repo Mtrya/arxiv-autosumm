@@ -64,7 +64,22 @@ jobs:
     - name: Check configuration strategy
       id: config_check
       run: |
-        if [ "${{ vars.USE_REPO_CONFIG }}" = "true" ] && [ -f "config.yaml" ]; then
+        echo "DEBUG: Current working directory: $(pwd)"
+        echo "DEBUG: USE_REPO_CONFIG (vars): '${{ vars.USE_REPO_CONFIG }}'"
+        echo "DEBUG: USE_REPO_CONFIG (env): '${{ env.USE_REPO_CONFIG }}'"
+        echo "DEBUG: config.yaml exists: $(if [ -f "config.yaml" ]; then echo "yes"; else echo "no"; fi)"
+        echo "DEBUG: Files in current directory:"
+        ls -la
+
+        # Check both vars and env for USE_REPO_CONFIG
+        USE_REPO_CONFIG_VALUE="${{ vars.USE_REPO_CONFIG }}"
+        if [ "$USE_REPO_CONFIG_VALUE" = "" ]; then
+          USE_REPO_CONFIG_VALUE="${{ env.USE_REPO_CONFIG }}"
+        fi
+
+        echo "DEBUG: Final USE_REPO_CONFIG value: '$USE_REPO_CONFIG_VALUE'"
+
+        if [ "$USE_REPO_CONFIG_VALUE" = "true" ] && [ -f "config.yaml" ]; then
           echo "USING_REPO_CONFIG=true" >> $GITHUB_OUTPUT
           echo "Using existing config.yaml from repository"
         else

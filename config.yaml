@@ -18,7 +18,7 @@ fetch:
 
 summarize:
   provider: dashscope
-  api_key: env:DASHSCOPE_API_KEY
+  api_key: sec:DASHSCOPE_API_KEY
   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   model: qwen3-max
   batch: true
@@ -34,13 +34,13 @@ rate:
   max_selected: 5
   embedder:
     provider: zhipu
-    api_key: env:ZHIPU_API_KEY
+    api_key: sec:ZHIPU_API_KEY
     base_url: https://open.bigmodel.cn/api/paas/v4
     model: embedding-3
     batch: true
   llm:
     provider: zhipu
-    api_key: env:ZHIPU_API_KEY
+    api_key: sec:ZHIPU_API_KEY
     base_url: https://open.bigmodel.cn/api/paas/v4
     model: glm-4.5-flash
     batch: true
@@ -71,7 +71,7 @@ parse:
   enable_vlm: true
   vlm:
     provider: zhipu
-    api_key: env:ZHIPU_API_KEY
+    api_key: sec:ZHIPU_API_KEY
     base_url: https://open.bigmodel.cn/api/paas/v4
     model: glm-4v-flash
     batch: true
@@ -96,5 +96,5 @@ deliver:
   smtp_server: smtp.163.com
   port: 465
   sender: arxiv_bot@163.com
-  recipient: env:RECIPIENT_EMAIL
-  password: env:SMTP_PASSWORD
+  recipient: sec:RECIPIENT_EMAIL
+  password: sec:SMTP_PASSWORD
