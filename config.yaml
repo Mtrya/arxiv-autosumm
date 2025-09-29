@@ -2,25 +2,26 @@ run:
   categories:
   - cs.AI
   - cs.CV
+  - cs.AI
   - cs.RO
-  - cs.SY
   - math.OC
-  - astro-ph.EP
-  - physics.space-ph
+  - cs.RO
+  - cs.CV
+  - cs.RO
   send_log: true
   log_dir: ./logs
 
 fetch:
-  days: 8
-  max_results: 200
+  days: 16
+  max_results: 768
   max_retries: 10
 
 summarize:
-  provider: modelscope
-  api_key: env:MODELSCOPE_API_KEY
-  base_url: https://api-inference.modelscope.cn/v1/
-  model: Qwen/Qwen3-235B-A22B-Thinking-2507
-  batch: false
+  provider: dashscope
+  api_key: env:DASHSCOPE_API_KEY
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  model: qwen3-max
+  batch: true
   system_prompt: file:./prompts/summ_lm/system.md
   user_prompt_template: file:./prompts/summ_lm/user.md
   completion_options:
@@ -28,16 +29,21 @@ summarize:
   context_length: 245760
 
 rate:
-  strategy: llm
-  top_k: 80
-  max_selected: 10
-  embedder: null
+  strategy: hybrid
+  top_k: 100
+  max_selected: 5
+  embedder:
+    provider: zhipu
+    api_key: env:ZHIPU_API_KEY
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    model: embedding-3
+    batch: true
   llm:
-    provider: modelscope
-    api_key: env:MODELSCOPE_API_KEY
-    base_url: https://api-inference.modelscope.cn/v1/
-    model: Qwen/Qwen2.5-7B-Instruct
-    batch: false
+    provider: zhipu
+    api_key: env:ZHIPU_API_KEY
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    model: glm-4.5-flash
+    batch: true
     system_prompt: file:./prompts/rate_lm/system.md
     user_prompt_template: file:./prompts/rate_lm/user.md
     completion_options:
@@ -54,6 +60,26 @@ rate:
       clarity:
         description: How well-written and understandable is the paper?
         weight: 0.2
+      relevance:
+        description: How relevant is this paper to your research interests?
+        weight: 0.15
+      impact:
+        description: What is the potential impact of this work?
+        weight: 0.1
+
+parse:
+  enable_vlm: true
+  vlm:
+    provider: zhipu
+    api_key: env:ZHIPU_API_KEY
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    model: glm-4v-flash
+    batch: false
+    system_prompt: file:./prompts/parse_vlm/system.md
+    user_prompt: file:./prompts/parse_vlm/user.md
+    complete_options:
+      temperature: 0.3
+    dpi: 224
 
 render:
   formats:
@@ -61,6 +87,10 @@ render:
   - md
   output_dir: ./output
   base_filename: null
+
+cache:
+  dir: ./cache
+  ttl_days: 16
 
 deliver:
   smtp_server: smtp.163.com
