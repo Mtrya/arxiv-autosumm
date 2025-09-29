@@ -6,10 +6,13 @@ import json
 import time
 import requests
 import tiktoken
+import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class BatchConfig:
@@ -55,9 +58,9 @@ class BaseClient(ABC):
         try:
             response.raise_for_status()
         except requests.exceptions.HTTPError as e:
-            print(f"HTTP Error: {e}")
-            print(f"Response status code: {response.status_code}")
-            print(f"Response text: {response.text}")
+            logger.error(f"HTTP Error: {e}", exc_info=True)
+            logger.error(f"Response status code: {response.status_code}")
+            logger.error(f"Response text: {response.text}")
             raise
 
         if "ollama" in self.config.provider.lower():
@@ -209,14 +212,14 @@ class BaseClient(ABC):
                     else:
                         response_body = result_item["response"]["body"]
                         if "error" in response_body:
-                            print(f"Batch item {custom_id} API error: {response_body['error']}")
+                            logger.error(f"Batch item {custom_id} API error: {response_body['error']}")
                             results[custom_id] = None
                         else:
                             content = response_body["choices"][0]["message"]["content"]
                             results[custom_id] = content
                         
                 except (json.JSONDecodeError, KeyError) as e:
-                    print(f"Failed to parse result line: {e}")
+                    logger.warning(f"Failed to parse result line: {e}", exc_info=True)
                     continue
         
         # Return results in original order
@@ -238,16 +241,16 @@ class BaseClient(ABC):
         if not failed_indices:
             return final_results
         
-        print(f"Retrying {len(failed_indices)} failed items individually...")
+        logger.info(f"Retrying {len(failed_indices)} failed items individually...")
 
         for idx in failed_indices:
             try:
                 individual_result = self.process_single(input_data_list[idx])
                 final_results[idx] = individual_result
                 if individual_result is not None:
-                    print(f"Successfully recovered item {idx} via individual processing")
+                    logger.info(f"Successfully recovered item {idx} via individual processing")
             except Exception as e:
-                print(f"Individual retry failed for item {idx}: {e}")
+                logger.error(f"Individual retry failed for item {idx}: {e}", exc_info=True)
 
         return final_results
     
@@ -293,7 +296,7 @@ class BaseClient(ABC):
             response_content = self._make_sync_request(payload)
             return self._parse_response(response_content)
         except Exception as e:
-            print(f"Failed to process: {e}")
+            logger.error(f"Failed to process input: {e}", exc_info=True)
             return ""
 
 def count_tokens(text: str) -> int:

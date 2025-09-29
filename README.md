@@ -30,10 +30,6 @@ cd arxiv-autosumm
 pip install -e .
 ```
 
-### Method 2: Using Docker
-
-#### **Not Implemented, Coming Soon**
-
 ## ⚡ Quick Start
 
 ### 1. Interactive Setup (Recommended)
@@ -428,7 +424,6 @@ You can also set these variables in ~/.bashrc, ~/.zshrc, etc. Using your API key
 
 ## 🚨 Known Limitations
 
-- **Docker support**: Not yet implemented (planned)
 - **Unit tests**: Limited test coverage (project is stable (in my use case) but needs more tests)
 - **Linux native**: Not tested on Windows or MacOS yet
 - **Rate limiting**: Some providers may have aggressive rate limits
@@ -436,11 +431,8 @@ You can also set these variables in ~/.bashrc, ~/.zshrc, etc. Using your API key
 
 ## Future Plan
 
-- **Docker**: Add docker support. Will probably add a setup.sh for local build while also preparing an docker image for immediate use
-- **Convenient Tests**: Add cli commands to do unit tests, enabling users to quickly find the prompt best tailored to their need
-- **Cross Platform**: Native Windows development installation
 - **More Providers**: Anthropic API format for Claude
-- **Audio Formats**: Use TTS models to convert summaries to speech, add recommended prompts to summarize papers as conversations.
+- **Update README**: Will update README to include convenient use of GitHub Actions workflow after testing
 
 ## 🔧 Advanced Configuration
 

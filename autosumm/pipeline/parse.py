@@ -108,8 +108,8 @@ def _cleanup_images(image_data_list: List[ImageData]):
     for image_data in image_data_list:
         try:
             Path(image_data.image_path).unlink(missing_ok=True)
-        except:
-            pass
+        except OSError as e:
+            logger.warning(f"Could not clean up image {image_data.image_path}: {e}", exc_info=True)
 
 def _reconstruct_results(vlm_results: List[Optional[str]], pdf_image_counts: List[int]) -> List[ParseResult]:
     """Reconstruct VLM results back to ParseResults per PDF"""

@@ -57,7 +57,7 @@ def fetch_new_papers(category, cacher: Cacher, fetch_config: dict, verbose: bool
 
         return papers
     except Exception as e:
-        logger.error(f"Failed to fetch new papers: {e}")
+        logger.error(f"Failed to fetch new papers: {e}", exc_info=True)
         return []
 
 def parse_papers(papers: List[PaperMetadata], parse_config, vlm: bool, batch_config=None, verbose: bool = False) -> List[PaperMetadata]:
@@ -91,7 +91,7 @@ def parse_papers(papers: List[PaperMetadata], parse_config, vlm: bool, batch_con
         logger.info(f"Parsed {len(successfully_parsed)} out of {len(papers)} papers")
         return successfully_parsed
     except Exception as e:
-        logger.error(f"Parse operation failed: {e}")
+        logger.error(f"Parse operation failed: {e}", exc_info=True)
         return []
 
 def select_papers_embed(papers: List[PaperMetadata], cacher: Cacher, rate_config, batch_config, verbose: bool = False) -> List[PaperMetadata]:
@@ -119,8 +119,7 @@ def select_papers_embed(papers: List[PaperMetadata], cacher: Cacher, rate_config
                     try:
                         cacher.store_similarity_score(paper.arxiv_id, paper.embed_score)
                     except Exception as e:
-                        if verbose:
-                            logger.debug(f"Failed to cache similarity score for {paper.arxiv_id}: {e}")
+                        logger.warning(f"Failed to cache similarity score for {paper.arxiv_id}: {e}", exc_info=True)
                     if verbose:
                         logger.debug(f"rate_embed for {paper.arxiv_id} success: {result.score}")
                 else:
@@ -137,7 +136,7 @@ def select_papers_embed(papers: List[PaperMetadata], cacher: Cacher, rate_config
             logger.info(f"Selected top {len(selected)} papers by embed score")
             return selected
     except Exception as e:
-        logger.error(f"Embed rating operation failed: {e}")
+        logger.error(f"Embed rating operation failed: {e}", exc_info=True)
         return papers_with_score
     
 def select_papers_llm(papers: List[PaperMetadata], cacher: Cacher, rate_config, batch_config, verbose: bool = False) -> List[PaperMetadata]:
@@ -167,8 +166,7 @@ def select_papers_llm(papers: List[PaperMetadata], cacher: Cacher, rate_config, 
                     try:
                         cacher.store_rating_score(paper.arxiv_id, paper.llm_score, {})
                     except Exception as e:
-                        if verbose:
-                            logger.debug(f"Failed to cache llm rating score for {paper.arxiv_id}: {e}")
+                        logger.warning(f"Failed to cache llm rating score for {paper.arxiv_id}: {e}", exc_info=True)
                     if verbose:
                         logger.debug(f"rate_llm for {paper.arxiv_id} succeeded: {result.score}")
                 else:
@@ -225,8 +223,7 @@ def summarize_paper(papers: List[PaperMetadata], cacher: Cacher, summarize_confi
             try:
                 cacher.mark_paper_processed(paper.arxiv_id, {})
             except Exception as e:
-                if verbose:
-                    logger.debug(f"Failed to mark {paper.arxiv_id} as processed: {e}")
+                logger.warning(f"Failed to mark {paper.arxiv_id} as processed: {e}", exc_info=True)
             if verbose:
                 logger.debug(f"Successfully prepared summary for {paper.arxiv_id}")
         
@@ -289,6 +286,11 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
         # 1. Determine category to fetch
         today = date.today()
         if (specified_category is not None) and (specified_category != "None"):
+            # Validate single category requirement
+            if ',' in specified_category:
+                logger.error(f"Multiple categories specified: {specified_category}. Only one category allowed.")
+                raise ValueError("Only one category can be specified at a time.")
+
             if specified_category in arxiv_categories:
                 category = specified_category
             else:
@@ -412,7 +414,7 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
             try:
                 shutil.rmtree(tmp_dir)
             except Exception as cleanup_e:
-                pass
+                logger.warning(f"Failed to cleanup temp directory {tmp_dir}: {cleanup_e}", exc_info=True)
         logging.shutdown()
 
 

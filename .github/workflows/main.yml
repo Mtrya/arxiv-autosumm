@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       category:
-        description: 'ArXiv category to process (optional, overrides config)'
+        description: 'ArXiv category to process (optional, overrides config, single category only)'
         required: false
         default: ''
       test_mode:
@@ -29,12 +29,21 @@ jobs:
         python-version: '3.11'
 
     - name: Cache pip dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
+
+    - name: Cache ArXiv Paper Database
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/arxiv-autosumm/
+        key: arxiv-cache-${{ hashFiles('config.yaml') }}
+        restore-keys: |
+          arxiv-cache-
+          arxiv-cache-${{ hashFiles('config.yaml') }}
 
     - name: Install system dependencies
       run: |
@@ -175,6 +184,10 @@ jobs:
           output_dir: ./output
           base_filename: null
 
+        cache:
+          dir: ~/.cache/arxiv-autosumm/
+          ttl_days: 16
+
         deliver:
           smtp_server: $SMTP_SERVER
           port: ${SMTP_PORT:-'465'}
@@ -196,9 +209,13 @@ jobs:
         echo "Output formats: $OUTPUT_FORMATS_CONFIG"
         echo "Rating strategy: $RATING_STRATEGY_CONFIG"
 
+    - name: Ensure cache directory exists
+      run: |
+        mkdir -p ~/.cache/arxiv-autosumm/
+
     - name: Validate configuration
       run: |
-        python -m autosumm.cli test-config --config config.yaml
+        python -m autosumm.cli run --config config.yaml --test
 
     - name: Run ArXiv AutoSumm
       env:
@@ -220,7 +237,7 @@ jobs:
       with:
         name: arxiv-summaries-${{ github.run_number }}
         path: |
-          output/
+          output/T
           logs/
           config.yaml
         retention-days: 30

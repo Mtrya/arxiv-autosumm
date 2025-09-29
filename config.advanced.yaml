@@ -1,0 +1,288 @@
+# ArXiv AutoSumm Advanced Configuration Template
+# Includes all features: VLM parsing, embedder rating, multiple output formats
+# Copy this to config.yaml and customize the values below
+
+run:
+  # ArXiv categories to monitor (comma-separated list)
+  categories: ["cs.AI", "cs.CV", "cs.RO", "cs.LG", "cs.CL"]
+
+  # Whether to send log files via email
+  send_log: true
+
+  # Directory for log files
+  log_dir: ./logs
+
+fetch:
+  # Number of days to look back for papers
+  days: 1
+
+  # Maximum number of papers to fetch from ArXiv
+  max_results: 500
+
+  # Maximum retry attempts for API calls
+  max_retries: 10
+
+summarize:
+  # LLM provider for summarization
+  provider: modelscope
+
+  # API key (use env:VAR_NAME for environment variables)
+  api_key: env:SUMMARIZER_API_KEY
+
+  # API base URL
+  base_url: https://api-inference.modelscope.cn/v1/
+
+  # Model name for summarization (use powerful model)
+  model: Qwen/Qwen2.5-7B-Instruct
+
+  # Enable batch processing if supported by provider
+  batch: false
+
+  # System prompt file path
+  system_prompt: file:./prompts/summ_lm/system.md
+
+  # User prompt template file path
+  user_prompt_template: file:./prompts/summ_lm/user.md
+
+  # LLM completion options
+  completion_options:
+    temperature: 0.7
+    top_p: 0.9
+    max_tokens: 4096
+
+  # Context length for summarization (tokens)
+  context_length: 245760
+
+rate:
+  # Rating strategy: llm, embedder, or hybrid
+  strategy: hybrid  # Best of both worlds: fast filtering + detailed rating
+
+  # Number of papers to pass to LLM for rating (after embedder filtering)
+  top_k: 100
+
+  # Maximum number of papers to select for summarization
+  max_selected: 15
+
+  # Embedder configuration (for embedder/hybrid strategies)
+  embedder:
+    # Embedding provider
+    provider: openai
+
+    # API key
+    api_key: env:EMBEDDER_API_KEY
+
+    # API base URL
+    base_url: https://api.openai.com/v1
+
+    # Embedding model
+    model: text-embedding-3-small
+
+    # Batch processing for embeddings
+    batch: true
+
+    # Embedding completion options
+    completion_options:
+      # Embedding dimensions (model-specific)
+      dimensions: 1536
+
+  # LLM rater configuration
+  llm:
+    # LLM provider for rating (can be cheaper than summarizer)
+    provider: modelscope
+
+    # API key
+    api_key: env:RATER_API_KEY
+
+    # API base URL
+    base_url: https://api-inference.modelscope.cn/v1/
+
+    # Model name for rating (cheaper/faster model)
+    model: Qwen/Qwen2.5-7B-Instruct
+
+    # Batch processing
+    batch: false
+
+    # System prompt file path
+    system_prompt: file:./prompts/rate_lm/system.md
+
+    # User prompt template file path
+    user_prompt_template: file:./prompts/rate_lm/user.md
+
+    # LLM completion options
+    completion_options:
+      temperature: 0.2
+      top_p: 0.9
+      max_tokens: 1024
+
+    # Context length for rating (tokens)
+    context_length: 122880
+
+    # Advanced rating criteria with weights
+    criteria:
+      novelty:
+        description: How original and innovative are the contributions?
+        weight: 0.3
+      methodology:
+        description: How rigorous is the experimental design and evaluation?
+        weight: 0.25
+      clarity:
+        description: How well-written and understandable is the paper?
+        weight: 0.2
+      relevance:
+        description: How relevant is this paper to your research interests?
+        weight: 0.15
+      impact:
+        description: What is the potential impact of this work?
+        weight: 0.1
+
+parse:
+  # Enable VLM (Vision Language Model) for enhanced PDF parsing
+  enable_vlm: true
+
+  # VLM configuration
+  vlm:
+    # VLM provider
+    provider: openai
+
+    # API key
+    api_key: env:VLM_API_KEY
+
+    # API base URL
+    base_url: https://api.openai.com/v1
+
+    # VLM model (must support vision)
+    model: gpt-4o
+
+    # Batch processing
+    batch: false
+
+    # System prompt file path
+    system_prompt: file:./prompts/parse_vlm/system.md
+
+    # User prompt file path
+    user_prompt: file:./prompts/parse_vlm/user.md
+
+    # VLM completion options
+    completion_options:
+      temperature: 0.3
+      max_tokens: 4096
+
+    # DPI for image processing
+    dpi: 168
+
+render:
+  # Output formats: pdf, md, html, azw3
+  formats: ["pdf", "html", "md", "azw3"]
+
+  # Output directory for generated files
+  output_dir: ./output
+
+  # Base filename for outputs
+  base_filename: arxiv-summary
+
+  # Format-specific configurations
+  pdf:
+    # PDF engine (xelatex recommended)
+    pdf_engine: xelatex
+
+    # PDF highlighting style
+    highlight_style: pygments
+
+    # Font size
+    font_size: 14pt
+
+    # Document class
+    document_class: extarticle
+
+    # Page margins
+    margin: 0.8in
+
+    # Color links
+    colorlinks: true
+
+    # Link color
+    link_color: RoyalBlue
+
+    # Line stretch
+    line_stretch: 1.10
+
+  html:
+    # Math renderer: mathjax, katex, or none
+    math_renderer: mathjax
+
+    # Include table of contents
+    include_toc: true
+
+    # Table of contents depth
+    toc_depth: 3
+
+    # Number sections
+    number_sections: false
+
+    # Standalone HTML document
+    standalone: true
+
+    # Self-contained HTML
+    self_contained: false
+
+    # CSS file path
+    css_file: null
+
+    # CSS inline styles
+    css_inline: null
+
+    # HTML template file
+    template_file: null
+
+    # Highlight style
+    highlight_style: pygments
+
+    # HTML5 output
+    html5: true
+
+  azw3:
+    # Path to ebook-convert executable
+    calibre_path: null
+
+    # Author metadata
+    author: ArXiv AutoSumm
+
+    # Title metadata
+    title: null
+
+    # Language
+    language: en
+
+    # Description
+    description: null
+
+    # Cover image path
+    cover_image: null
+
+cache:
+  # Cache directory for storing paper processing data
+  # For GitHub Actions, use: ~/.cache/arxiv-autosumm/
+  # For local runs, use: ./cache
+  dir: ./cache
+
+  # Cache time-to-live in days
+  ttl_days: 16
+
+deliver:
+  # SMTP server for email delivery
+  smtp_server: smtp.gmail.com
+
+  # SMTP port (465 for SSL, 587 for TLS)
+  port: 465
+
+  # Sender email address
+  sender: your-email@gmail.com
+
+  # Recipient email address (can be multiple, comma-separated)
+  recipient: your-email@gmail.com
+
+  # SMTP password (use env:VAR_NAME for environment variables)
+  password: env:SMTP_PASSWORD
+
+  # Maximum attachment size in MB (default: 25.0)
+  max_attachment_size_mb: 25.0

@@ -1,0 +1,148 @@
+# ArXiv AutoSumm Basic Configuration Template
+# Copy this to config.yaml and customize the values below
+
+run:
+  # ArXiv categories to monitor (comma-separated list)
+  # See full list: https://arxiv.org/category_taxonomy
+  categories: ["cs.AI", "cs.CV", "cs.RO"]
+
+  # Whether to send log files via email
+  send_log: false
+
+  # Directory for log files
+  log_dir: ./logs
+
+fetch:
+  # Number of days to look back for papers
+  days: 1
+
+  # Maximum number of papers to fetch from ArXiv
+  max_results: 200
+
+  # Maximum retry attempts for API calls
+  max_retries: 10
+
+summarize:
+  # LLM provider for summarization
+  # Options: openai, deepseek, modelscope, dashscope, siliconflow, ollama, etc.
+  provider: modelscope
+
+  # API key (use env:VAR_NAME for environment variables)
+  api_key: env:SUMMARIZER_API_KEY
+
+  # API base URL (will be auto-filled for recognized providers)
+  base_url: https://api-inference.modelscope.cn/v1/
+
+  # Model name for summarization
+  model: Qwen/Qwen2.5-7B-Instruct
+
+  # Disable batch processing (recommended for most providers)
+  batch: false
+
+  # System prompt file path
+  system_prompt: file:./prompts/summ_lm/system.md
+
+  # User prompt template file path
+  user_prompt_template: file:./prompts/summ_lm/user.md
+
+  # LLM completion options
+  completion_options:
+    temperature: 0.7
+
+  # Context length for summarization (tokens)
+  context_length: 131072
+
+rate:
+  # Rating strategy: llm, embedder, or hybrid
+  # llm: Use LLM to rate papers by criteria
+  # embedder: Use embedding similarity for filtering
+  # hybrid: Use embedder for pre-filtering, then LLM for detailed rating
+  strategy: llm
+
+  # Number of papers to pass to LLM for rating (after embedder filtering if hybrid)
+  top_k: 80
+
+  # Maximum number of papers to select for summarization
+  max_selected: 10
+
+  # Embedder configuration (for embedder/hybrid strategies)
+  embedder: null
+
+  # LLM rater configuration
+  llm:
+    # LLM provider for rating (can be different from summarizer)
+    provider: modelscope
+
+    # API key (use env:VAR_NAME for environment variables)
+    api_key: env:RATER_API_KEY
+
+    # API base URL
+    base_url: https://api-inference.modelscope.cn/v1/
+
+    # Model name for rating (can be cheaper/faster than summarizer)
+    model: Qwen/Qwen2.5-7B-Instruct
+
+    # Disable batch processing
+    batch: false
+
+    # System prompt file path
+    system_prompt: file:./prompts/rate_lm/system.md
+
+    # User prompt template file path
+    user_prompt_template: file:./prompts/rate_lm/user.md
+
+    # LLM completion options
+    completion_options:
+      temperature: 0.2
+      max_tokens: 1024
+
+    # Context length for rating (tokens)
+    context_length: 32768
+
+    # Rating criteria with weights
+    criteria:
+      novelty:
+        description: How original and innovative are the contributions?
+        weight: 0.3
+      methodology:
+        description: How rigorous is the experimental design and evaluation?
+        weight: 0.25
+      clarity:
+        description: How well-written and understandable is the paper?
+        weight: 0.2
+
+render:
+  # Output formats: pdf, md, html, azw3
+  # Note: pdf requires TeXLive, azw3 requires Calibre
+  formats: ["pdf", "md"]
+
+  # Output directory for generated files
+  output_dir: ./output
+
+  # Base filename for outputs (null = use default)
+  base_filename: null
+
+cache:
+  # Cache directory for storing paper processing data
+  # For GitHub Actions, use: ~/.cache/arxiv-autosumm/
+  # For local runs, use: ./cache
+  dir: ./cache
+
+  # Cache time-to-live in days
+  ttl_days: 16
+
+deliver:
+  # SMTP server for email delivery
+  smtp_server: smtp.gmail.com
+
+  # SMTP port (465 for SSL, 587 for TLS)
+  port: 465
+
+  # Sender email address
+  sender: your-email@gmail.com
+
+  # Recipient email address
+  recipient: your-email@gmail.com
+
+  # SMTP password (use env:VAR_NAME for environment variables)
+  password: env:SMTP_PASSWORD
