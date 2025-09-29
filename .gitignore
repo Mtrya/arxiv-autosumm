@@ -1,18 +1,60 @@
-legacy*.py
-downloads/
-tmp/
-__pycache__
-test_output
-main_.py
-*.txt
-*.yaml
-!config.yaml
-output
-CLAUDE.md
-*.egg-info
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.Python
+build/
+dist/
+eggs/
+.eggs/
+wheels/
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+
+# Environment variables
 .env
-logs
-PLAN.md
-cache
-.venv
 uv.lock
+
+# Local config and output
+config-local.yaml
+*.local.yaml
+output/
+logs/
+cache/
+tmp/
+downloads/
+
+# Legacy and temporary files
+legacy*.py
+main_.py
+test_output
+
+# Documentation and notes
+CLAUDE.md
+PLAN.md
+
+# Text files (excluding specific config files)
+*.txt
+!config.yaml
+
+# Markdown files (excluding important docs)
+*.md
+!README.md
+!config-request.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db

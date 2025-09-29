@@ -6,7 +6,6 @@ Handles only paper fetching and pdf downloading.
 from dataclasses import dataclass
 from typing import List, Optional
 from datetime import datetime, timedelta
-from pathlib import Path
 import logging
 import arxiv
 import time

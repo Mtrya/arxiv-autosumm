@@ -5,13 +5,12 @@ Tests API endpoints, authentication, model availability and external dependencie
 
 import smtplib
 import subprocess
-from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, Any, Optional
 from dataclasses import dataclass
 import requests
 
 from .pipeline import (
-    fetch, parse_fast, parse_vlm, rate_embed, rate_llm, render, summarize
+    parse_vlm, rate_embed, rate_llm, summarize
 )
 
 from .config import MainConfig

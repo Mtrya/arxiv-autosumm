@@ -8,7 +8,6 @@ Focuses on the 4 essential items only, with basic validation.
 
 import typer
 from typing import Dict, List, Optional
-from pathlib import Path
 from pydantic import ValidationError
 import yaml
 import re
@@ -225,7 +224,6 @@ def get_rater_model(provider: str) -> str:
     }
     return fallback.get(p, "deepseek-chat")
 
-
 def configure_categories() -> Dict[str, any]:
     """Configure categories and log sent."""
     categories = select_categories_interactively()
@@ -234,7 +232,6 @@ def configure_categories() -> Dict[str, any]:
     return {
         "categories": categories, 
     }
-
 
 def configure_email() -> Dict[str, any]:
     """Configure email settings."""
@@ -282,7 +279,6 @@ def configure_email() -> Dict[str, any]:
         "recipient": recipient,
         "password": password
     }
-
 
 def create_config_from_wizard(config_path: str) -> MainConfig:
     """Create configuration through interactive wizard."""
@@ -403,7 +399,6 @@ def create_config_from_wizard(config_path: str) -> MainConfig:
     except Exception as e:
         typer.echo(f"\n❌ Basic configuration validation failed: {e}")
         raise typer.Exit(1)
-
 
 def run_setup_wizard(config_path: str = "config.yaml") -> None:
     """Run the complete setup wizard."""

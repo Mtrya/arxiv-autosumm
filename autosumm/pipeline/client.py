@@ -8,7 +8,7 @@ import requests
 import tiktoken
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
 @dataclass

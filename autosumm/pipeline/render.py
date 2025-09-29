@@ -2,13 +2,12 @@
 Render summary contents to specified format(s).
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from dataclasses import dataclass, field
 from pathlib import Path
 import subprocess
 from multiprocessing import Pool
 import re
-import os
 import logging
 from datetime import datetime
 from contextlib import contextmanager

@@ -1,10 +1,8 @@
 """Pydantic models with basic validations"""
 
-from pydantic import BaseModel, field_validator, ConfigDict, model_validator, ValidationError
+from pydantic import BaseModel, field_validator, ConfigDict, model_validator
 from typing import Optional, Dict, Any, Union, List
 import yaml
-from datetime import datetime
-from pathlib import Path
 from dotenv import main
 import os
 import re

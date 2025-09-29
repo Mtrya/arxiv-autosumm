@@ -5,10 +5,8 @@ Rate fetched papers with a coarse-to-fine strategy.
 import numpy as np
 import requests
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional, Dict, Union, Tuple, Any
-from pathlib import Path
-import time
 from json_repair import repair_json
 import logging
 

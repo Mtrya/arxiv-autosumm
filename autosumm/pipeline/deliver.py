@@ -6,9 +6,7 @@ Handles file attachments with size limits and error detection.
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
 from email.mime.application import MIMEApplication
-from email import encoders
 from pathlib import Path
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any
