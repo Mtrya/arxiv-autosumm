@@ -208,7 +208,7 @@ jobs:
         fi
 
     - name: Upload outputs as artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: arxiv-summaries-${{ github.run_number }}
