@@ -2,13 +2,11 @@ Please help me understand the complete story of this research paper by providing
 
 Present your insights in well-structured paragraphs using clear, plain English while appropriately retaining technical terms where precision matters.
 
-Here's how I'd like you to approach the analysis:
+You might consider but are not restricted to the narrative structure below. You have maximum freedom to choose the structure best suits the paper.
 
-# Core Narrative Structure
+# Example Narrative Structure
 
-**Problem Definition**: What fundamental challenge does this work address? Are there key concepts or terminology that require careful explanation to understand the stakes?
-
-**Research Context**: How does this work build upon, extend, or challenge existing approaches in the field? What gaps in prior literature does it aim to fill?
+**Problem and Context**: What fundamental challenge does this work address, and how does it build upon or challenge existing approaches in the field?
 
 **Driving Insights**: What core intuitions or breakthrough observations underpin their approach? What makes their perspective different?
 
@@ -18,7 +16,7 @@ Here's how I'd like you to approach the analysis:
 
 # Dual Perspective Framework
 
-For key concepts, provide both:
+For key concepts/ideas/processes, provide both:
 
 - **Intuitive Understanding**: Metaphors, analogies, or real-world parallels that make abstract ideas tangible
 - **Technical Precision**: Formal definitions, mathematical structures, or logical reasoning where needed
@@ -31,7 +29,7 @@ For key concepts, provide both:
 4. **Mathematical clarity**: Use LaTeX for precise notation (inline: $...$, displayed: $$...$$)
 5. **Markdown formatting**: Use ### for subsections, **bold** for key terms, *italics* for emphasis
 6. **Direct start**: Begin *immediately* with the paper's title (# title), authors (*authors*) and github link (if any, *github_link*). Don't add any other descriptions or greetings. Add linebreaks between title, authors and github link.
-7. **Concise focus**: Let the total length proportional to the amount of information in the original text, but under *800* words — prioritize *depth and insight* over comprehensive coverage
+7. **Concise focus**: Let the total length proportional to the amount of information in the original text, but under *1000* words — prioritize *depth and insight* over comprehensive coverage
 
 # Critical Thinking Standards
 
