@@ -5,197 +5,17 @@ Automated research paper summarization from ArXiv with LLM-powered rating, multi
 ## 🚀 What Works Now
 
 **✅ Complete pipeline**: fetch → parse → rate → summarize → render → deliver  
-**✅ CLI**: Interactive setup, configuration testing, and summarization pipeline running  
 **✅ Multi-format output**: Markdown, HTML, PDF, AZW3 (Kindle)  
 
 ## 📦 Installation
 
-### Method 1: Development Installation
+### Quick Start
 
-Create and activate an virtual environment (optional but recommended)
+Use GitHub Actions workflow. Detailed documentation coming soon.
 
-```bash
-# python3 -m venv arxiv-env
-# source arxiv-env/bin/activate
-# Or using conda
-# conda create -n arxiv-env
-# conda activate arxiv-env
-```
+### Local Setup
 
-Then install in the virtual environment
-
-```bash
-git clone https://github.com/Mtrya/arxiv-autosumm.git
-cd arxiv-autosumm
-pip install -e .
-```
-
-## ⚡ Quick Start
-
-### 1. Interactive Setup (Recommended)
-
-```bash
-autosumm init
-```
-
-This will guide you through:
-
-- LLM provider selection and API key setup
-- ArXiv categories configuration
-- Email delivery setup
-- Validation and testing
-
-### 2. Manual Configuration
-
-```bash
-cp config.yaml my_config.yaml
-# Edit my_config.yaml with your custom settings
-autosumm test-config --config my_config.yaml # test if config is valid
-autosumm run --config my_config.yaml # run pipeline
-```
-
-### 3. Environment Variables *(Optional)*
-
-Use `.env` file or environment variables for sensitive data:
-
-```bash
-# .env file
-DASHSCOPE_API_KEY=your-key-here
-SMTP_PASSWORD=your-app-password
-```
-
-### 4. Start with CLI Commands
-
-```bash
-# Run the complete pipeline
-autosumm run [--config path/to/config.yaml] [--verbose] [--category an_arxiv_category]
-
-# Or simply:
-autosumm run
-
-# Get help
-autosumm --help
-autosumm [command] --help
-```
-
-## Recommended Usage
-
-### Automated Daily Summaries with Cron
-
-Set up automated daily paper summaries using cron:
-
-```bash
-# Add to crontab (crontab -e)
-# Run daily at 8 AM
-0 8 * * * cd /path/to/arxiv-autosumm && autosumm run --config my_config.yaml
-
-# Run weekly on Monday at 9 AM
-0 9 * * 1 cd /path/to/arxiv-autosumm && autosumm run --config my_config.yaml
-```
-
-### Systemd Timer (Modern Alternative)
-
-Create a systemd service for more reliable scheduling.
-
-#### Method 1: Direct Python Path (Universal - Works with any environment manager)
-
-```bash
-# First, activate your environment using your preferred method:
-# conda activate myenv
-# source venv/bin/activate  
-# poetry shell
-# pipenv shell
-# etc.
-
-# Then find your Python path
-which python
-
-# Use that exact path in your service file
-```bash
-# Create service file: ~/.config/systemd/user/arxiv-autosumm.service
-[Unit]
-Description=ArXiv AutoSumm Daily Pipeline
-After=network-online.target
-
-[Service]
-Type=oneshot
-WorkingDirectory=/path/to/arxiv-autosumm
-ExecStart=/your/env/python/path -m autosumm.cli run --config my_config.yaml
-# Note that systemd services executes commands directly using execve(), so env variables in .bashrc won't work,
-# to explicitly invoke shell features (bash for example), use
-# /bin/bash -c '/your/env/python/path -m autosumm.cli run --config my_config.yaml'
-
-[Install]
-WantedBy=default.target
-```
-
-#### Method 2: Environment Activation (If Method 1 doesn't work)
-
-```bash
-# For most virtual environments (adjust activation command for your setup):
-[Unit]
-Description=ArXiv AutoSumm Daily Pipeline
-After=network-online.target
-
-[Service]
-Type=oneshot
-WorkingDirectory=/path/to/arxiv-autosumm
-ExecStart=/bin/bash -c 'source /path/to/activate-script && python -m autosumm.cli run --config my_config.yaml'
-
-[Install]
-WantedBy=default.target
-```
-
-Common activation scripts by environment type:
-
-- venv/virtualenv: `source /path/to/venv/bin/activate`
-- conda: `source /path/to/conda/etc/profile.d/conda.sh && conda activate env-name`
-- poetry: `cd /project/dir && poetry run python -m autosumm.cli run --config my_config.yaml`
-
-#### Timer Configuration
-
-```bash
-# Create timer file: ~/.config/systemd/user/arxiv-autosumm.timer
-[Unit]
-Description=Run ArXiv AutoSumm daily
-
-[Timer]
-OnCalendar=*-*-* 2:00:00
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-```
-
-#### Testing Your Setup
-
-```bash
-# Test the exact command from your service file
-/your/env/python/path -m autosumm.cli run --config my_config.yaml
-
-# Then proceed with systemd setup
-systemctl --user daemon-reload
-systemctl --user enable arxiv-autosumm.timer
-systemctl --user start arxiv-autosumm.timer
-systemctl --user list-timers # should see arxiv-autosumm
-
-# Try testing with 
-```
-
-### Manual CLI Usage
-
-**Daily workflow:**
-
-```bash
-# Run pipeline with one of the categories 
-autosumm run
-
-# Run pipeline with specified category
-autosumm run --category cs.AI
-
-# Debug mode with verbose output
-autosumm run --verbose
-```
+Clone and use locally. Detailed documentation coming soon.
 
 ## Pipeline Description
 
@@ -354,78 +174,8 @@ deliver:
 | **Zhipu** | glm-4.5, glm-4.5-flash | Requires ZHIPU_API_KEY |
 | **VolcEngine** | doubao-1.6-seed-thinking | Requires ARK_API_KEY |
 
-## Common Issues
-
-### **API Connection Problems**
-
-```bash
-# Test API connectivity
-curl -H "Authorization: Bearer YOUR_KEY" \
-  https://api.provider.com/v1/models
-
-# Check provider configuration
-autosumm test-config # check connectiviy, authentication, batch/vision support (if configured) and completion_options validity
-```
-
-### **Email Delivery Issues**
-
-```bash
-# Test SMTP connection
-autosumm test-config --skip-api-checks
-```
-
-### **PDF Generation Fails**
-
-```bash
-# Check TeXLive installation
-which xelatex
-which pandoc
-
-# Install missing packages
-sudo apt-get install texlive-latex-base texlive-latex-extra texlive-xetex pandoc
-
-# Then test again with autosumm test-config --skip-api-checks
-autosumm test-config --skip-api-checks
-```
-
-### **AZW3 Conversion Issues**
-
-```bash
-# Check Calibre installation
-which ebook-convert
-
-# Test conversion manually
-ebook-convert input.html output.azw3
-
-# Specify calibre_path in config.yaml if necessary
-# Then test again with autosumm test-config --skip-api-checks
-autosumm test-config --skip-api-checks
-```
-
-## Environment Setup
-
-### **Setting up .env file**
-
-```bash
-# Create .env file
-cat > .env << EOF
-DASHSCOPE_API_KEY=your-dashscope-key
-OPENAI_API_KEY=your-openai-key
-SMTP_PASSWORD=your-app-password
-EMAIL_SENDER=your-email@gmail.com
-EMAIL_RECIPIENT=your-email@gmail.com
-EOF
-
-# Make sure .env is in your working directory
-autosumm run --config my_config.yaml
-```
-
-You can also set these variables in ~/.bashrc, ~/.zshrc, etc. Using your API keys directly without hiding it is also totally fine, as long as you're sure about the safety issue.
-
 ## 🚨 Known Limitations
 
-- **Unit tests**: Limited test coverage (project is stable (in my use case) but needs more tests)
-- **Linux native**: Not tested on Windows or MacOS yet
 - **Rate limiting**: Some providers may have aggressive rate limits
 - **VLM Parsing**: Enabling VLM parsing may require significant time and tokens, especially for large PDFs, and the parsing quality is not guaranteed (rely on the specific model and prompts)
 
@@ -433,6 +183,7 @@ You can also set these variables in ~/.bashrc, ~/.zshrc, etc. Using your API key
 
 - **More Providers**: Anthropic API format for Claude
 - **Update README**: Will update README to include convenient use of GitHub Actions workflow after testing
+- **Tune Prompts**: Provide clear and simple entrance for users to tune their custom prompts
 
 ## 🔧 Advanced Configuration
 

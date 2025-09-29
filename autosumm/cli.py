@@ -6,6 +6,29 @@ from typing import Optional
 app = typer.Typer(name="autosumm")
 
 @app.command()
+def tune(
+    config_path: Optional[str] = typer.Option(
+        "config.yaml",
+        "--config",
+        "-c",
+        help="Path to configuration file"
+    ),
+    category: str = typer.Option(
+        None,
+        "--category",
+        "-s",
+        help=""
+    )
+):
+    """
+    A placeholder command for prompt tuning entrance
+    """
+    typer.echo("🔍 Tune feature coming soon!")
+    typer.echo(f"   Config: {config_path}")
+    if category:
+        typer.echo(f"   Category: {category}")
+
+@app.command()
 def run(
     config_path: Optional[str] = typer.Option(
         "config.yaml",
