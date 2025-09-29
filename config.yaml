@@ -74,7 +74,7 @@ parse:
     api_key: env:ZHIPU_API_KEY
     base_url: https://open.bigmodel.cn/api/paas/v4
     model: glm-4v-flash
-    batch: false
+    batch: true
     system_prompt: file:./prompts/parse_vlm/system.md
     user_prompt: file:./prompts/parse_vlm/user.md
     complete_options:
@@ -96,5 +96,5 @@ deliver:
   smtp_server: smtp.163.com
   port: 465
   sender: arxiv_bot@163.com
-  recipient: kaupane20@yeah.net
+  recipient: env:RECIPIENT_EMAIL
   password: env:SMTP_PASSWORD
