@@ -99,8 +99,15 @@ jobs:
         MAX_PAPERS_CONFIG=${MAX_PAPERS:-'10'}
         OUTPUT_FORMATS_CONFIG=${OUTPUT_FORMATS:-'pdf,md'}
         RATING_STRATEGY_CONFIG=${RATING_STRATEGY:-'llm'}
-        TEST_DAYS=${TEST_MODE && '30' || '1'}
-        TEST_MAX_RESULTS=${TEST_MODE && '10' || '200'}
+
+        # Handle test mode with proper bash syntax
+        if [ "${{ github.event.inputs.test_mode || false }}" = "true" ]; then
+          TEST_DAYS="30"
+          TEST_MAX_RESULTS="10"
+        else
+          TEST_DAYS="1"
+          TEST_MAX_RESULTS="200"
+        fi
 
         # Determine provider defaults
         if [ -z "$SUMMARIZER_PROVIDER" ]; then
@@ -239,8 +246,7 @@ jobs:
           output/**/*
         draft: false
         prerelease: false
-        make_latest: false
-
+        
     - name: Clean up old releases
       if: github.event_name == 'schedule'
       run: |
