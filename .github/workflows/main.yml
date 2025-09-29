@@ -1,0 +1,250 @@
+name: ArXiv AutoSumm Daily
+
+on:
+  schedule:
+    # Run daily at 22:00 UTC (adjust as needed)
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+    inputs:
+      category:
+        description: 'ArXiv category to process (optional, overrides config)'
+        required: false
+        default: ''
+      test_mode:
+        description: 'Run in test mode (limited papers, shorter time range)'
+        type: boolean
+        default: false
+
+jobs:
+  run-arxiv-autosumm:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          texlive-latex-base \
+          texlive-latex-extra \
+          texlive-xetex \
+          pandoc \
+          calibre \
+          curl
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+
+    - name: Check configuration strategy
+      id: config_check
+      run: |
+        if [ "${{ vars.USE_REPO_CONFIG }}" = "true" ] && [ -f "config.yaml" ]; then
+          echo "USING_REPO_CONFIG=true" >> $GITHUB_OUTPUT
+          echo "Using existing config.yaml from repository"
+        else
+          echo "USING_REPO_CONFIG=false" >> $GITHUB_OUTPUT
+          echo "Will generate config from environment variables"
+        fi
+
+    - name: Create config from environment (if needed)
+      if: steps.config_check.outputs.USING_REPO_CONFIG != 'true'
+      env:
+        # ArXiv configuration
+        ARXIV_CATEGORIES: ${{ secrets.ARXIV_CATEGORIES }}
+
+        # Summarizer LLM configuration
+        SUMMARIZER_PROVIDER: ${{ secrets.SUMMARIZER_PROVIDER }}
+        SUMMARIZER_API_KEY: ${{ secrets.SUMMARIZER_API_KEY }}
+        SUMMARIZER_BASE_URL: ${{ secrets.SUMMARIZER_BASE_URL }}
+        SUMMARIZER_MODEL: ${{ secrets.SUMMARIZER_MODEL }}
+
+        # Rater LLM configuration
+        RATER_PROVIDER: ${{ secrets.RATER_PROVIDER }}
+        RATER_API_KEY: ${{ secrets.RATER_API_KEY }}
+        RATER_BASE_URL: ${{ secrets.RATER_BASE_URL }}
+        RATER_MODEL: ${{ secrets.RATER_MODEL }}
+
+        # Email configuration
+        SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+        SMTP_PORT: ${{ secrets.SMTP_PORT }}
+        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+        RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+
+        # Repository variables
+        MAX_PAPERS: ${{ vars.MAX_PAPERS }}
+        OUTPUT_FORMATS: ${{ vars.OUTPUT_FORMATS }}
+        RATING_STRATEGY: ${{ vars.RATING_STRATEGY }}
+        TEST_MODE: ${{ github.event.inputs.test_mode || false }}
+      run: |
+        # Set default values
+        CATEGORIES=${ARXIV_CATEGORIES:-'cs.AI,cs.CV,cs.RO'}
+        MAX_PAPERS_CONFIG=${MAX_PAPERS:-'10'}
+        OUTPUT_FORMATS_CONFIG=${OUTPUT_FORMATS:-'pdf,md'}
+        RATING_STRATEGY_CONFIG=${RATING_STRATEGY:-'llm'}
+        TEST_DAYS=${TEST_MODE && '30' || '1'}
+        TEST_MAX_RESULTS=${TEST_MODE && '10' || '200'}
+
+        # Determine provider defaults
+        if [ -z "$SUMMARIZER_PROVIDER" ]; then
+          SUMMARIZER_PROVIDER="modelscope"
+        fi
+
+        if [ -z "$RATER_PROVIDER" ]; then
+          RATER_PROVIDER="$SUMMARIZER_PROVIDER"
+        fi
+
+        # Create config.yaml from environment variables
+        cat > config.yaml << EOF
+        run:
+          categories: [$(echo $CATEGORIES | sed 's/,/, /g')]
+          send_log: true
+          log_dir: ./logs
+
+        fetch:
+          days: $TEST_DAYS
+          max_results: $TEST_MAX_RESULTS
+          max_retries: 10
+
+        summarize:
+          provider: $SUMMARIZER_PROVIDER
+          api_key: env:SUMMARIZER_API_KEY
+          base_url: ${SUMMARIZER_BASE_URL:-'https://api-inference.modelscope.cn/v1/'}
+          model: ${SUMMARIZER_MODEL:-'Qwen/Qwen2.5-7B-Instruct'}
+          batch: false
+          system_prompt: file:./prompts/summ_lm/system.md
+          user_prompt_template: file:./prompts/summ_lm/user.md
+          completion_options:
+            temperature: 0.7
+          context_length: 245760
+
+        rate:
+          strategy: $RATING_STRATEGY_CONFIG
+          top_k: 80
+          max_selected: $MAX_PAPERS_CONFIG
+          embedder: null
+          llm:
+            provider: $RATER_PROVIDER
+            api_key: env:RATER_API_KEY
+            base_url: ${RATER_BASE_URL:-'https://api-inference.modelscope.cn/v1/'}
+            model: ${RATER_MODEL:-'Qwen/Qwen2.5-7B-Instruct'}
+            batch: false
+            system_prompt: file:./prompts/rate_lm/system.md
+            user_prompt_template: file:./prompts/rate_lm/user.md
+            completion_options:
+              temperature: 0.2
+              max_tokens: 1024
+            context_length: 122880
+            criteria:
+              novelty:
+                description: How original and innovative are the contributions?
+                weight: 0.3
+              methodology:
+                description: How rigorous is the experimental design and evaluation?
+                weight: 0.25
+              clarity:
+                description: How well-written and understandable is the paper?
+                weight: 0.2
+
+        render:
+          formats: [$(echo $OUTPUT_FORMATS_CONFIG | sed 's/,/, /g')]
+          output_dir: ./output
+          base_filename: null
+
+        deliver:
+          smtp_server: $SMTP_SERVER
+          port: ${SMTP_PORT:-'465'}
+          sender: $SENDER_EMAIL
+          recipient: $RECIPIENT_EMAIL
+          password: env:SMTP_PASSWORD
+        EOF
+
+        # Create .env file for API keys
+        cat > .env << EOF
+        SUMMARIZER_API_KEY=$SUMMARIZER_API_KEY
+        RATER_API_KEY=$RATER_API_KEY
+        SMTP_PASSWORD=$SMTP_PASSWORD
+        EOF
+
+        echo "Configuration generated successfully"
+        echo "Categories: $CATEGORIES"
+        echo "Max papers: $MAX_PAPERS_CONFIG"
+        echo "Output formats: $OUTPUT_FORMATS_CONFIG"
+        echo "Rating strategy: $RATING_STRATEGY_CONFIG"
+
+    - name: Validate configuration
+      run: |
+        python -m autosumm.cli test-config --config config.yaml
+
+    - name: Run ArXiv AutoSumm
+      env:
+        SUMMARIZER_API_KEY: ${{ secrets.SUMMARIZER_API_KEY }}
+        RATER_API_KEY: ${{ secrets.RATER_API_KEY }}
+        SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      run: |
+        if [ "${{ github.event.inputs.category }}" != "" ]; then
+          echo "Running with specified category: ${{ github.event.inputs.category }}"
+          python -m autosumm.cli run --config config.yaml --verbose --specify-category "${{ github.event.inputs.category }}"
+        else
+          echo "Running with default categories from config"
+          python -m autosumm.cli run --config config.yaml --verbose
+        fi
+
+    - name: Upload outputs as artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: arxiv-summaries-${{ github.run_number }}
+        path: |
+          output/
+          logs/
+          config.yaml
+        retention-days: 30
+
+    - name: Create Daily Release (scheduled runs only)
+      if: success() && github.event_name == 'schedule'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: daily-${{ github.run_number }}
+        name: Daily ArXiv Summaries - ${{ github.run_number }}
+        body: |
+          Automated ArXiv paper summaries generated on ${{ github.event.created_at }}
+
+          ## Configuration Used
+          - **Categories**: ${{ secrets.ARXIV_CATEGORIES || 'cs.AI,cs.CV,cs.RO' }}
+          - **Max Papers**: ${{ vars.MAX_PAPERS || '10' }}
+          - **Output Formats**: ${{ vars.OUTPUT_FORMATS || 'pdf,md' }}
+          - **Rating Strategy**: ${{ vars.RATING_STRATEGY || 'llm' }}
+
+          ## Files
+          This release contains the generated summary files for today's ArXiv papers.
+        files: |
+          output/**/*
+        draft: false
+        prerelease: false
+        make_latest: false
+
+    - name: Clean up old releases
+      if: github.event_name == 'schedule'
+      run: |
+        # Keep only the last 7 daily releases to avoid clutter
+        gh release list --limit 50 | grep "daily-" | tail -n +8 | cut -f1 | xargs -r gh release delete -y
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

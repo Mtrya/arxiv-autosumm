@@ -19,7 +19,7 @@ ENV/
 
 # Environment variables
 .env
-uv.lock
+.claude
 
 # Local config and output
 config-local.yaml
