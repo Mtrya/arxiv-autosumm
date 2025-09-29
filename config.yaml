@@ -25,7 +25,7 @@ summarize:
   system_prompt: file:./prompts/summ_lm/system.md
   user_prompt_template: file:./prompts/summ_lm/user.md
   completion_options:
-    temperature: 0.7
+    temperature: 1.0
   context_length: 245760
 
 rate:
