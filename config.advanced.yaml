@@ -14,7 +14,7 @@ run:
 
 fetch:
   # Number of days to look back for papers
-  days: 1
+  days: 3
 
   # Maximum number of papers to fetch from ArXiv
   max_results: 500
@@ -48,7 +48,7 @@ summarize:
   completion_options:
     temperature: 0.7
     top_p: 0.9
-    max_tokens: 4096
+    max_tokens: 32768
 
   # Context length for summarization (tokens)
   context_length: 245760
@@ -77,13 +77,11 @@ rate:
     # Embedding model
     model: text-embedding-3-small
 
-    # Batch processing for embeddings
-    batch: true
+    query_template: file:./prompts/rate_emb/query.md
 
-    # Embedding completion options
-    completion_options:
-      # Embedding dimensions (model-specific)
-      dimensions: 1536
+    user_interests: "Embodied AI, Artificial intelligence"
+
+    context_length: 2048
 
   # LLM rater configuration
   llm:
@@ -139,6 +137,10 @@ parse:
   # Enable VLM (Vision Language Model) for enhanced PDF parsing
   enable_vlm: true
 
+  tmp_dir: ./tmp
+
+  fast_parser_timeout_seconds: 224
+
   # VLM configuration
   vlm:
     # VLM provider
@@ -170,6 +172,15 @@ parse:
     # DPI for image processing
     dpi: 168
 
+batch:
+  tmp_dir: ./tmp
+
+  max_wait_hours: 24
+
+  poll_interval_seconds: 30
+
+  fallback_on_error: true
+
 render:
   # Output formats: pdf, md, html, azw3
   formats: ["pdf", "html", "md", "azw3"]
@@ -181,6 +192,9 @@ render:
   base_filename: arxiv-summary
 
   # Format-specific configurations
+  md:
+    include_pagebreaks: true
+
   pdf:
     # PDF engine (xelatex recommended)
     pdf_engine: xelatex
@@ -206,9 +220,23 @@ render:
     # Line stretch
     line_stretch: 1.10
 
+    pandoc_input_format: "markdown+raw_tex+yaml_metadata_block"
+
+    pandoc_from_format: "gfm"
+
+    list_item_sep: 0pt
+
+    list_par_sep: 0pt
+
+    list_top_sep: 6pt
+
   html:
     # Math renderer: mathjax, katex, or none
     math_renderer: mathjax
+
+    mathjax_url: null
+
+    katex_url: null
 
     # Include table of contents
     include_toc: true
@@ -245,7 +273,7 @@ render:
     calibre_path: null
 
     # Author metadata
-    author: ArXiv AutoSumm
+    author: "ArXiv AutoSumm"
 
     # Title metadata
     title: null

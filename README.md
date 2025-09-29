@@ -2,20 +2,295 @@
 
 Automated research paper summarization from ArXiv with LLM-powered rating, multi-format delivery, and comprehensive configuration management.
 
-## 🚀 What Works Now
-
-**✅ Complete pipeline**: fetch → parse → rate → summarize → render → deliver  
-**✅ Multi-format output**: Markdown, HTML, PDF, AZW3 (Kindle)  
+[English](README.md) | [中文](README.zh-CN.md)
 
 ## 📦 Installation
 
-### Quick Start
+### Method 1: GitHub Actions (Recommended)
 
-Use GitHub Actions workflow. Detailed documentation coming soon.
+GitHub Actions provides automated, scheduled execution without maintaining local infrastructure. Choose from two configuration approaches:
 
-### Local Setup
+#### Option A: Dynamic Configuration (Quick Start)
 
-Clone and use locally. Detailed documentation coming soon.
+This approach automatically generates configuration from repository secrets - no config file commits needed.
+
+**Prerequisites:**
+
+- GitHub account
+- API keys for LLM providers
+- SMTP Email and password
+
+**Steps:**
+
+1. **Fork (and star please) the Repository**
+
+   - Click "Fork" in the top-right corner
+   - Choose your GitHub account
+
+2. **Configure Repository Secrets**
+
+   - Navigate to your fork → Settings → Secrets and variables → Actions
+   - Add the following secrets:
+
+   | Secret                | Required | Type | Allowed Values                            | Role                           | Default             | Example                                |
+   | --------------------- | -------- | ---- | ----------------------------------------- | ------------------------------ | ------------------- | -------------------------------------- |
+   | `SUMMARIZER_PROVIDER` | ❌        | str  | Provider name                             | LLM provider for summarization | `modelscope`        | `deepseek`                             |
+   | `RATER_PROVIDER`      | ❌        | str  | Provider name                             | LLM provider for paper rating  | `modelscope`        | `zhipu`                                |
+   | `SUMMARIZER_API_KEY`  | ✅        | str  | Valid API key                             | API key for summarizer LLM     | -                   | `sk-xxx`                               |
+   | `RATER_API_KEY`       | ✅        | str  | Valid API key                             | API key for rater LLM          | -                   | `sk-xxx`                               |
+   | `SMTP_SERVER`         | ✅        | str  | Valid SMTP server                         | SMTP server for email delivery | -                   | `smtp.gmail.com`                       |
+   | `SENDER_EMAIL`        | ✅        | str  | Valid email                               | Sender email address           | -                   | `your-email@gmail.com`                 |
+   | `RECIPIENT_EMAIL`     | ✅        | str  | Valid email                               | Recipient email address        | -                   | `recipient@email.com`                  |
+   | `SMTP_PASSWORD`       | ✅        | str  | Valid password                            | SMTP password or app password  | -                   | `ASqfdvaer123456`                      |
+   | `SUMMARIZER_BASE_URL` | ❌        | str  | Valid URL                                 | Base URL for summarizer API    | Provider-specific   | `https://api.deepseek.com/v1`          |
+   | `SUMMARIZER_MODEL`    | ❌        | str  | Model name                                | Model name for summarization   | Provider-specific   | `deepseek-reasoner`                    |
+   | `RATER_BASE_URL`      | ❌        | str  | Valid URL                                 | Base URL for rater API         | Provider-specific   | `https://open.bigmodel.cn/api/paas/v4` |
+   | `RATER_MODEL`         | ❌        | str  | Model name                                | Model name for paper rating    | Provider specific   | `glm-4.5-flash`                        |
+   | `ARXIV_CATEGORIES`    | ❌        | str  | Real ArXiv categories                     | ArXiv categories to monitor    | `cs.AI,cs.CV,cs.RO` | `cs.AI,cs.LG,cs.RO`                    |
+   | `MAX_PAPERS`          | ❌        | int  | 1-1000                                    | Maximum number of summaries    | `5`                 | `10`                                   |
+   | `OUTPUT_FORMATS`      | ❌        | str  | pdf, html, md and pdf, separated by comma | Output formats                 | `pdf,md`            | `pdf,html,md`                          |
+   | `SMTP_PORT`           | ❌        | int  | Valid port number                         | SMTP port number               | `465`               | `587`                                  |
+
+   **Note**: The system auto-detects base URLs and default models from recognized provider names. If you specify a recognized provider (e.g., `deepseek`, `openai`, `dashscope`), the base URL and default model will be automatically configured. For custom providers or when not specifying a provider name, you must provide the base URL and model name manually.
+
+3. **Enable GitHub Actions**
+
+   - Navigate to Actions tab in your fork
+   - Enable Actions if prompted
+   - Choose option: "I understand my workflows, go ahead and enable them"
+
+4. **Run the Workflow**
+
+   - **Manual**: Go to Actions → "ArXiv AutoSumm Daily" → "Run workflow"
+   - **Scheduled**: Runs automatically daily at 22:00 UTC
+   - **Test Mode**: Check "Run in test mode" for limited processing
+
+#### Option B: Repository Configuration (Advanced)
+
+For full control over advanced settings like VLM parsing, embedder rating and custom configurations, we recommend using `config.py` in the repository.
+
+**Prerequisites:**
+
+- Same as Option A
+
+**Steps:**
+
+1. **Fork and Set Repository Variable**
+
+   - Fork the repository (same as Option A)
+   - Navigate to Settings → Variables → Actions
+   - Add repository variable: `USE_REPO_CONFIG = true`
+
+2. **Configure and Commit config.yaml**
+
+   - Copy `config.advanced.yaml` to `config.yaml`
+   - **Put all settings directly in config.yaml**: categories, models, output formats, etc.
+   - **Only use secret references for sensitive data**: `api_key: sec:API_KEY`
+   - Commit `config.yaml` to your repository
+
+3. **Customize Prompts (Optional)**
+
+   - Edit prompt files in `prompts/` directory to customize behavior
+   - **Preserve all `{...}` template placeholders** in the prompts
+   - Common customizations:
+     - `prompts/summ_lm/` - Summarization style and focus
+     - `prompts/rate_lm/` - Rating criteria emphasis
+     - `prompts/rate_emb/` - Embedding query for relevance filtering
+     - `prompts/parse_vlm/` - VLM parsing instructions
+
+4. **Configure Required Secrets**
+
+   - Only set secrets for sensitive data referenced in your `config.yaml`
+   - Use any of the allowed secret names from the workflow
+
+**Allowed Secret Names** (from main.yml environment):
+
+```secrets
+# LLM Provider Keys
+OPENAI_API_KEY, DEEPSEEK_API_KEY, MODELSCOPE_API_KEY, DASHSCOPE_API_KEY
+SILICONFLOW_API_KEY, ZHIPU_API_KEY, MOONSHOT_API_KEY, MINIMAX_API_KEY
+ANTHROCIC_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, VOLCENGINE_API_KEY
+
+# Custom Function Keys
+SUMMARIZER_API_KEY, RATER_API_KEY, EMBEDDER_API_KEY, VLM_API_KEY, LLM_API_KEY, API_KEY
+
+# Email Configuration
+SMTP_PASSWORD, SENDER_EMAIL, RECIPIENT_EMAIL, SMTP_SERVER, SMTP_PORT
+
+# Configuration Variables
+ARXIV_CATEGORIES, MAX_PAPERS, OUTPUT_FORMATS, RATING_STRATEGY
+```
+
+### Method 2: Local Setup with Git Clone
+
+Full local control over execution timing and configuration.
+
+#### Prerequisites
+
+**System Requirements:**
+
+- Git
+- System dependencies (based on desired output formats)
+
+**Optional System Dependencies:**
+
+```bash
+# For PDF output
+sudo apt-get install texlive-latex-base texlive-latex-extra texlive-xetex
+
+# For HTML output
+sudo apt-get install pandoc
+
+# For AZW3 (Kindle) output
+sudo apt-get install calibre
+
+# Install all at once
+sudo apt-get install texlive-latex-base texlive-latex-extra texlive-xetex pandoc calibre
+```
+
+#### Installation Steps
+
+1. **Clone Repository**
+
+   ```bash
+   git clone https://github.com/your-username/arxiv-autosumm.git
+   cd arxiv-autosumm
+   ```
+
+2. **Install Python Dependencies**
+
+   ```bash
+   pip install -e .
+   ```
+
+3. **Configure Application**
+
+   **Basic Configuration:**
+
+   ```bash
+   cp config.basic.yaml config.yaml
+   # Edit config.yaml with your settings
+   ```
+
+   **Advanced Configuration:**
+
+   ```bash
+   cp config.advanced.yaml config.yaml
+   # Edit config.yaml for advanced features
+   ```
+
+   **Environment Variables** (alternative to config file):
+
+   ```bash
+   # Create .env file
+   echo "SUMMARIZER_API_KEY=your_key" > .env
+   echo "RATER_API_KEY=your_key" >> .env
+   echo "SMTP_PASSWORD=your_password" >> .env
+   ```
+
+4. **Test Configuration**
+
+   ```bash
+   autosumm run --test
+   ```
+
+5. **Run Pipeline**
+
+   ```bash
+   # Normal execution
+   autosumm run
+   
+   # Verbose output
+   autosumm run --verbose
+   
+   # Single category only
+   autosumm run --specify-category cs.AI
+   ```
+
+#### Local Scheduling
+
+For automated execution, you can use either systemd (recommended) or crontab.
+
+##### Systemd Timer (Recommended)
+
+Create a systemd service and timer for modern, reliable scheduling:
+
+```bash
+# Create systemd service file
+sudo tee /etc/systemd/system/arxiv-autosumm.service > /dev/null << 'EOF'
+[Unit]
+Description=ArXiv AutoSumm Service
+After=network.target
+
+[Service]
+Type=oneshot
+User=your-username
+WorkingDirectory=/path/to/arxiv-autosumm
+ExecStart=/usr/bin/python -m autosumm.cli run
+StandardOutput=journal
+StandardError=journal
+EOF
+
+# Create systemd timer file
+sudo tee /etc/systemd/system/arxiv-autosumm.timer > /dev/null << 'EOF'
+[Unit]
+Description=ArXiv AutoSumm Timer
+Requires=arxiv-autosumm.service
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+# Reload systemd and enable timer
+sudo systemctl daemon-reload
+sudo systemctl enable arxiv-autosumm.timer
+sudo systemctl start arxiv-autosumm.timer
+
+# Check timer status
+systemctl list-timers --all
+```
+
+##### Crontab (Alternative)
+
+For systems without systemd, use traditional crontab:
+
+```bash
+# Edit crontab
+crontab -e
+
+# Run daily at 9 AM
+0 9 * * * cd /path/to/arxiv-autosumm && autosumm run
+
+# Run every 6 hours
+0 */6 * * * cd /path/to/arxiv-autosumm && autosumm run
+```
+
+### Features
+
+**Common Features:**
+
+- **Automated Paper Processing**: Complete pipeline from ArXiv fetching to email delivery on a daily schedule
+- **Multiple Output Formats**: PDF, HTML, Markdown, AZW3 (Kindle)
+- **Advanced Caching**: SQLite-based deduplication to avoid redundant processing
+- **Email Delivery**: SMTP configuration with attachment support
+
+**GitHub Actions Specific:**
+
+- **No Infrastructure Management**: GitHub provides all computing resources
+- **Built-in Monitoring**: Automatic logging and execution history
+- **Easy Deployment**: Fork repository, configure secrets, and run
+- **Two Configuration Options**: Dynamic (secrets-based) or repository-based
+
+**Local Setup Specific:**
+
+- **Full Control**: Complete customization of all components
+- **Unlimited Execution**: No time or resource constraints
+- **Local Debugging**: Complete development environment access
+- **Data Privacy**: All processing and storage remains local (if you use local models)
 
 ## Pipeline Description
 
@@ -55,25 +330,11 @@ rate:
 - **rate:top_k** → papers passed to LLM for rating (after optional embedder filtering)
 - **rate:max_selected** → final papers selected for optional vlm parsing and summarization (after rating)
 
-## 📊 Output Formats
+## Configuration
 
-| Format | Dependencies | Notes |
-|--------|--------------|--------|
-| **Markdown** | None | Primary format, always available |
-| **HTML** | pandoc | MathJax support for equations |
-| **PDF** | TeXLive + pandoc | Uses XeLaTeX engine, includes bibliography |
-| **AZW3** | Calibre (ebook-convert) + pandoc | Kindle format with table of contents |
+### Basic Configuration
 
-### Format Requirements
-
-```bash
-# Ubuntu/Debian
-sudo apt-get install texlive-latex-base texlive-latex-extra texlive-xetex pandoc calibre
-```
-
-## Basic Configuration
-
-### Run
+#### Run
 
 ```yaml
 run:
@@ -82,7 +343,7 @@ run:
   log_dir: ./logs # where to store logfiles  
 ```
 
-### Fetch
+#### Fetch
 
 ```yaml
 fetch:
@@ -91,7 +352,7 @@ fetch:
   max_retries: 10
 ```
 
-### Summarizer Config
+#### Summarizer Config
 
 ```yaml
 summarize:
@@ -108,7 +369,7 @@ summarize:
   context_length: 131072 # default to 131072, this parameter decides how paper content will be truncated to fit in model's context length
 ```
 
-### Paper Rating
+#### Paper Rating
 
 ```yaml
 rate:
@@ -139,7 +400,7 @@ rate:
         weight: 0.2
 ```
 
-### Render Config
+#### Render Config
 
 ```yaml
 render:
@@ -148,7 +409,7 @@ render:
   base_filename: null # default to "summary". Summary naming is {base_filename}_{category}_{year&week}.{extension_name}
 ```
 
-### Deliver and Email
+#### Deliver and Email
 
 ```yaml
 deliver:
@@ -159,7 +420,7 @@ deliver:
   password: env:SMTP_PASSWORD
 ```
 
-### Default LLM Providers
+#### Default LLM Providers
 
 | Provider | Example Model | Notes |
 |----------|---------------|--------|
@@ -174,6 +435,10 @@ deliver:
 | **Zhipu** | glm-4.5, glm-4.5-flash | Requires ZHIPU_API_KEY |
 | **VolcEngine** | doubao-1.6-seed-thinking | Requires ARK_API_KEY |
 
+### Advanced Configuration
+
+#### Coming soon
+
 ## 🚨 Known Limitations
 
 - **Rate limiting**: Some providers may have aggressive rate limits
@@ -182,12 +447,8 @@ deliver:
 ## Future Plan
 
 - **More Providers**: Anthropic API format for Claude
-- **Update README**: Will update README to include convenient use of GitHub Actions workflow after testing
+- **Update README**: Update README with more user-friendly illustrations and configuration instruction
 - **Tune Prompts**: Provide clear and simple entrance for users to tune their custom prompts
-
-## 🔧 Advanced Configuration
-
-### Coming soon
 
 ## 📄 License
 

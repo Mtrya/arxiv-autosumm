@@ -13,7 +13,7 @@ run:
 
 fetch:
   days: 16
-  max_results: 768
+  max_results: 576
   max_retries: 10
 
 summarize:
@@ -30,14 +30,16 @@ summarize:
 
 rate:
   strategy: hybrid
-  top_k: 100
+  top_k: 128
   max_selected: 5
   embedder:
     provider: zhipu
     api_key: var:ZHIPU_API_KEY
     base_url: https://open.bigmodel.cn/api/paas/v4
     model: embedding-3
-    batch: true
+    query_template: file:./prompts/rate_emb/query.md
+    user_interests: "Embodied AI, Artificial intelligence and Astronomy"
+    context_length: 8000
   llm:
     provider: zhipu
     api_key: var:ZHIPU_API_KEY
@@ -69,6 +71,8 @@ rate:
 
 parse:
   enable_vlm: true
+  tmp_dir: ./tmp
+  fast_parser_timeout_seconds: 300
   vlm:
     provider: zhipu
     api_key: var:ZHIPU_API_KEY
@@ -79,7 +83,7 @@ parse:
     user_prompt: file:./prompts/parse_vlm/user.md
     complete_options:
       temperature: 0.3
-    dpi: 224
+    dpi: 200
 
 render:
   formats:

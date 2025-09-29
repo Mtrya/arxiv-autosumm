@@ -64,17 +64,13 @@ jobs:
     - name: Check configuration strategy
       id: config_check
       run: |
-        echo "DEBUG: Current working directory: $(pwd)"
-        echo "DEBUG: USE_REPO_CONFIG (vars): '${{ vars.USE_REPO_CONFIG }}'"
-        echo "DEBUG: USE_REPO_CONFIG (env): '${{ env.USE_REPO_CONFIG }}'"
-        echo "DEBUG: config.yaml exists: $(if [ -f "config.yaml" ]; then echo "yes"; else echo "no"; fi)"
-        echo "DEBUG: Files in current directory:"
-        ls -la
-
         # Check both vars and env for USE_REPO_CONFIG
         USE_REPO_CONFIG_VALUE="${{ vars.USE_REPO_CONFIG }}"
         if [ "$USE_REPO_CONFIG_VALUE" = "" ]; then
           USE_REPO_CONFIG_VALUE="${{ env.USE_REPO_CONFIG }}"
+        fi
+        if [ "$USE_REPO_CONFIG_VALUE" = "" ]; then
+          USE_REPO_CONFIG_VALUE="${{ secrets.USE_REPO_CONFIG }}"
         fi
 
         echo "DEBUG: Final USE_REPO_CONFIG value: '$USE_REPO_CONFIG_VALUE'"
@@ -92,6 +88,9 @@ jobs:
       env:
         # ArXiv configuration
         ARXIV_CATEGORIES: ${{ secrets.ARXIV_CATEGORIES }}
+        MAX_PAPERS: ${{ secrets.MAX_PAPERS }}
+        OUTPUT_FORMATS: ${{ secrets.OUTPUT_FORMATS }}
+        RATING_STRATEGY: ${{ secret.RATING_STRATEGY }}
 
         # Summarizer LLM configuration
         SUMMARIZER_PROVIDER: ${{ secrets.SUMMARIZER_PROVIDER }}
@@ -113,14 +112,11 @@ jobs:
         SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
 
         # Repository variables
-        MAX_PAPERS: ${{ vars.MAX_PAPERS }}
-        OUTPUT_FORMATS: ${{ vars.OUTPUT_FORMATS }}
-        RATING_STRATEGY: ${{ vars.RATING_STRATEGY }}
         TEST_MODE: ${{ github.event.inputs.test_mode || false }}
       run: |
         # Set default values
         CATEGORIES=${ARXIV_CATEGORIES:-'cs.AI,cs.CV,cs.RO'}
-        MAX_PAPERS_CONFIG=${MAX_PAPERS:-'10'}
+        MAX_PAPERS_CONFIG=${MAX_PAPERS:-'5'}
         OUTPUT_FORMATS_CONFIG=${OUTPUT_FORMATS:-'pdf,md'}
         RATING_STRATEGY_CONFIG=${RATING_STRATEGY:-'llm'}
 
@@ -256,6 +252,9 @@ jobs:
 
         # Common secret name variations
         API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        EMBEDDER_API_KEY: ${{ secrets.EMBEDDER_API_KEY }}
+        VLM_API_KEY: ${{secrets.VLM_API_KEY }}
+        LLM_API_KEY: ${{secrets.LLM_API_KEY }}
 
         # Secrets from default config generation
         SUMMARIZER_API_KEY: ${{ secrets.SUMMARIZER_API_KEY }}
@@ -298,6 +297,9 @@ jobs:
 
         # Common secret name variations
         API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        EMBEDDER_API_KEY: ${{ secrets.EMBEDDER_API_KEY }}
+        VLM_API_KEY: ${{secrets.VLM_API_KEY }}
+        LLM_API_KEY: ${{secrets.LLM_API_KEY }}
 
         # Secrets from default config generation
         SUMMARIZER_API_KEY: ${{ secrets.SUMMARIZER_API_KEY }}

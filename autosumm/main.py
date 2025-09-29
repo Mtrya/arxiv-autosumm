@@ -259,6 +259,7 @@ def setup_logging(log_dir: str, send_log: bool, verbose: bool = False):
     # Suppress INFO/WARNING logs from noisy libraries
     logging.getLogger('arxiv').setLevel(logging.ERROR)
     logging.getLogger('pdfminer').setLevel(logging.ERROR)
+    logging.getLogger('urllib3').setLevel(logging.Error)
     
     return logging.getLogger(__name__), log_file_path
 
