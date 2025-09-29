@@ -737,7 +737,7 @@ class MainConfig(BaseModel):
                             # The error message from _resolve_references now contains the
                             # full path, so we report it as a single, clear error message.
                             'loc': ('config',),
-                            'msg': str(e) + " check if references ('env:', 'sec:', '$', and 'file:') are correctly set",
+                            'msg': str(e) + " check if references ('env:', 'var:', '$', and 'file:') are correctly set",
                             'input': 'file: or env: reference',
                         }
                     ]
@@ -759,7 +759,7 @@ class MainConfig(BaseModel):
 
     @staticmethod
     def _resolve_references(data: Dict[str,Any]) -> Dict[str, Any]:
-        """Recursively resolve 'file:path', 'env:variable', 'sec:secret', and '$variable' references"""
+        """Recursively resolve 'file:path', 'env:variable', 'var:variable', and '$variable' references"""
         main.load_dotenv() # load .env file
         if isinstance(data, dict):
             result = {}
@@ -778,8 +778,8 @@ class MainConfig(BaseModel):
                         raise ValueError(f"Environment variable '{envname}' is not set or is empty. Please check your .env file or environment variables.")
                     else:
                         result[key] = value
-                elif isinstance(value, str) and value.startswith('sec:'):
-                    # sec: prefix for secrets (same as env: but semantically clearer for secrets)
+                elif isinstance(value, str) and value.startswith('var:'):
+                    # var: prefix for secrets (same as env: but semantically clearer for secrets)
                     envname = value[4:]
                     value = os.getenv(envname)
                     if value is None:
