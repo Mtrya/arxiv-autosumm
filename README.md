@@ -446,9 +446,8 @@ deliver:
 
 ## Future Plan
 
-- **More Providers**: Anthropic API format for Claude
 - **Update README**: Update README with more user-friendly illustrations and configuration instruction
-- **Tune Prompts**: Provide clear and simple entrance for users to tune their custom prompts
+- **Prompt Tuning Entrance**: Provide clear and simple entrance for users to tune their custom prompts
 
 ## 📄 License
 

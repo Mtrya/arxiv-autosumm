@@ -10,10 +10,6 @@ on:
         description: 'ArXiv category to process (optional, overrides config, single category only)'
         required: false
         default: ''
-      test_mode:
-        description: 'Run in test mode (limited papers, shorter time range)'
-        type: boolean
-        default: false
 
 jobs:
   run-arxiv-autosumm:
