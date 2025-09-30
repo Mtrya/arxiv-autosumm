@@ -36,10 +36,10 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/arxiv-autosumm/
-        key: arxiv-cache-${{ hashFiles('config.yaml') }}
+        key: arxiv-cache-v2-${{ hashFiles('prompts/**/*') }}
         restore-keys: |
-          arxiv-cache-
-          arxiv-cache-${{ hashFiles('config.yaml') }}
+          arxiv-cache-v2-
+          arxiv-cache-v1-
 
     - name: Install system dependencies
       run: |

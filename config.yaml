@@ -72,7 +72,7 @@ render:
   base_filename: null
 
 cache:
-  dir: ./cache
+  dir: ~/.cache/arxiv-autosumm/
   ttl_days: 16
 
 deliver:
