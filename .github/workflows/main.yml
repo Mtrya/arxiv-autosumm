@@ -90,7 +90,7 @@ jobs:
         ARXIV_CATEGORIES: ${{ secrets.ARXIV_CATEGORIES }}
         MAX_PAPERS: ${{ secrets.MAX_PAPERS }}
         OUTPUT_FORMATS: ${{ secrets.OUTPUT_FORMATS }}
-        RATING_STRATEGY: ${{ secret.RATING_STRATEGY }}
+        RATING_STRATEGY: ${{ secrets.RATING_STRATEGY }}
 
         # Summarizer LLM configuration
         SUMMARIZER_PROVIDER: ${{ secrets.SUMMARIZER_PROVIDER }}

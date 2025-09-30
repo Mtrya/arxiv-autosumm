@@ -449,6 +449,7 @@ deliver:
 - **More Providers**: Anthropic API format for Claude
 - **Update README**: Update README with more user-friendly illustrations and configuration instruction
 - **Tune Prompts**: Provide clear and simple entrance for users to tune their custom prompts
+- **Variable Override**: Enable repository variables to override config.yaml to reduce redundant commits
 
 ## 📄 License
 
