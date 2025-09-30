@@ -240,7 +240,7 @@ jobs:
 
           # Export ALL repository variables as environment variables
           echo '${{ toJSON(vars) }}' | jq -r 'to_entries[] |
-            "export \(.key)=\"\(.value)\""' > /tmp/vars_exports.sh
+            "export \(.key)=\(.value)"' > /tmp/vars_exports.sh
 
           # Source the exports to make them available in current shell
           source /tmp/vars_exports.sh

@@ -758,6 +758,41 @@ class MainConfig(BaseModel):
         return cls(**data)
 
     @staticmethod
+    def _convert_env_value(value: str, target_type_hint: Any = None) -> Any:
+        """
+        Convert environment variable string to appropriate type.
+        Handles quote stripping and basic type conversion.
+        """
+        if not isinstance(value, str):
+            return value
+
+        # Strip surrounding quotes if present
+        if (value.startswith('"') and value.endswith('"')) or \
+           (value.startswith("'") and value.endswith("'")):
+            value = value[1:-1]
+
+        # If no type hint provided, return cleaned string
+        if target_type_hint is None:
+            return value
+
+        # Try to convert to appropriate type based on hint
+        try:
+            if target_type_hint == int:
+                return int(value)
+            elif target_type_hint == float:
+                return float(value)
+            elif target_type_hint == bool:
+                return value.lower() in ('true', '1', 'yes', 'on')
+            elif target_type_hint == list:
+                # Handle comma-separated values
+                return [item.strip() for item in value.split(',') if item.strip()]
+        except (ValueError, TypeError):
+            # If conversion fails, return original string
+            pass
+
+        return value
+
+    @staticmethod
     def _resolve_references(data: Dict[str,Any]) -> Dict[str, Any]:
         """
         Recursively resolve 'file:path', 'env:variable', 'var:variable', and '$variable' references
@@ -782,7 +817,7 @@ class MainConfig(BaseModel):
                     if value is None:
                         raise ValueError(f"Environment variable '{envname}' is not set or is empty. Please check your .env file or environment variables.")
                     else:
-                        result[key] = value
+                        result[key] = MainConfig._convert_env_value(value)
                 elif isinstance(value, str) and value.startswith('var:'):
                     # var: prefix for secrets (same as env: but semantically clearer for secrets)
                     envname = value[4:]
@@ -790,7 +825,7 @@ class MainConfig(BaseModel):
                     if value is None:
                         raise ValueError(f"Secret '{envname}' is not set or is empty. Please check your repository secrets or environment variables.")
                     else:
-                        result[key] = value
+                        result[key] = MainConfig._convert_env_value(value)
                 elif isinstance(value, str) and value.startswith('$'):
                     # $ prefix for bash-style environment variables
                     envname = value[1:]
@@ -798,7 +833,7 @@ class MainConfig(BaseModel):
                     if value is None:
                         raise ValueError(f"Environment variable '{envname}' is not set or is empty. Please check your .env file or environment variables.")
                     else:
-                        result[key] = value
+                        result[key] = MainConfig._convert_env_value(value)
                 elif isinstance(value, str) and value.startswith('sec:'):
                     # sec: prefix for environment variables
                     envname = value[4:]
@@ -806,7 +841,7 @@ class MainConfig(BaseModel):
                     if value is None:
                         raise ValueError(f"Environment variable '{envname}' is not set or is empty. Please check your .env file or environment variables.")
                     else:
-                        result[key] = value
+                        result[key] = MainConfig._convert_env_value(value)
                 else:
                     result[key] = MainConfig._resolve_references(value)
             return result

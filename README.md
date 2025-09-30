@@ -81,7 +81,6 @@ For full control over advanced settings like VLM parsing, embedder rating and cu
    - Navigate to Settings → Variables → Actions
    - Add repository variable: `USE_REPO_CONFIG = true`
 
-
 2. **Configure and Commit config.yaml**
 
    - Copy `config.advanced.yaml` to `config.yaml`
@@ -114,6 +113,7 @@ For full control over advanced settings like VLM parsing, embedder rating and cu
    - Reference in config.yaml with `var:` prefix: `max_results: var:FETCH_RESULTS`
 
 **Example Usage:**
+
 ```yaml
 fetch:
   max_results: var:FETCH_RESULTS    # Repository variable
@@ -128,6 +128,7 @@ rate:
 ```
 
 **Allowed Secret Names** (predefined in workflow):
+
 ```secrets
 # LLM Provider Keys
 OPENAI_API_KEY, DEEPSEEK_API_KEY, MODELSCOPE_API_KEY, DASHSCOPE_API_KEY
