@@ -523,7 +523,7 @@ class ParserConfig(BaseModel):
     def validate_vlm_required(cls, v: Optional[ParserVLMConfig], info):
         enable_vlm = info.data.get('enable_vlm', False)
         if enable_vlm and v is None:
-            raise ValueError("vlm config required when enable_vlm is True")
+            raise ValueError("VLM configuration is required when enable_vlm is True. Please add the vlm section with provider, model, and API configuration under parse: in your config.yaml")
         return v
     
     def to_pipeline_config(self):

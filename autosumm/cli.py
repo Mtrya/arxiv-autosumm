@@ -119,6 +119,9 @@ def run(
 
             except Exception as e:
                 typer.echo(f"❌ Configuration test failed: {e}", err=True)
+                typer.echo(f"   📋 Full error details:", err=True)
+                import traceback
+                typer.echo(traceback.format_exc(), err=True)
                 raise typer.Exit(1)
         else:
             # Normal execution
@@ -127,9 +130,15 @@ def run(
 
     except ImportError as e:
         typer.echo(f"❌ Error importing pipeline: {e}", err=True)
+        typer.echo(f"   📋 Full error details:", err=True)
+        import traceback
+        typer.echo(traceback.format_exc(), err=True)
         raise typer.Exit(1)
     except Exception as e:
         typer.echo(f"❌ Pipeline failed: {e}", err=True)
+        typer.echo(f"   📋 Full error details:", err=True)
+        import traceback
+        typer.echo(traceback.format_exc(), err=True)
         raise typer.Exit(1)
 
 if __name__ == "__main__":

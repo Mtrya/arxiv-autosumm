@@ -304,13 +304,19 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
                 
                 # Get similarities for all chunks (could use batch processing here)
                 chunk_similarities = [embedder_client.process_single(chunk_text) for chunk_text in chunk_texts]
-                
-                # Calculate weighted average
-                total_weight = sum(chunk_weights)
-                if total_weight > 0:
-                    weighted_similarity = sum(sim * weight for sim, weight in zip(chunk_similarities, chunk_weights)) / total_weight
+
+                # Calculate weighted average, filtering out None values (failed API calls)
+                valid_pairs = [(sim, weight) for sim, weight in zip(chunk_similarities, chunk_weights) if sim is not None]
+
+                if valid_pairs:
+                    total_weight = sum(weight for _, weight in valid_pairs)
+                    if total_weight > 0:
+                        weighted_similarity = sum(sim * weight for sim, weight in valid_pairs) / total_weight
+                    else:
+                        weighted_similarity = 0.0
                 else:
-                    weighted_similarity = 0.0
+                    # All chunks failed - this is a complete failure
+                    weighted_similarity = None
                 
                 similarity_score = weighted_similarity
                 logger.debug(f"Processed chunked paper with {len(chunks)} chunks")
