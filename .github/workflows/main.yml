@@ -220,6 +220,40 @@ jobs:
       run: |
         mkdir -p ~/.cache/arxiv-autosumm/
 
+    - name: Export all repository variables as environment variables
+      run: |
+        # Universal repository variable exporter - works with ANY variable name
+        # This allows users to set any repository variable and use it in their config.yaml
+        echo "🔧 Exporting ALL repository variables as environment variables..."
+
+        # Check if we have any repository variables
+        if [ -z "${{ toJSON(vars) }}" ] || [ "${{ toJSON(vars) }}" = "{}" ]; then
+          echo "ℹ️ No repository variables found"
+        else
+          echo "📋 Found repository variables, exporting as environment variables..."
+
+          # Install jq if not present (it's usually available in GitHub runners)
+          if ! command -v jq &> /dev/null; then
+            echo "📦 Installing jq for JSON processing..."
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
+          # Export ALL repository variables as environment variables
+          echo '${{ toJSON(vars) }}' | jq -r 'to_entries[] |
+            "export \(.key)=\"\(.value)\""' > /tmp/vars_exports.sh
+
+          # Source the exports to make them available in current shell
+          source /tmp/vars_exports.sh
+
+          # Show what was exported (without revealing values)
+          echo '${{ toJSON(vars) }}' | jq -r 'keys[]' | while read var_name; do
+            echo "  ✅ Exported: $var_name"
+          done
+
+          # Make the exports available to subsequent steps by adding to GITHUB_ENV
+          sed 's/^export //' /tmp/vars_exports.sh >> $GITHUB_ENV
+        fi
+
     - name: Validate configuration
       env:
         # Common API provider secrets (all providers from recognized_providers in config.py)

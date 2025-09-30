@@ -81,6 +81,7 @@ For full control over advanced settings like VLM parsing, embedder rating and cu
    - Navigate to Settings → Variables → Actions
    - Add repository variable: `USE_REPO_CONFIG = true`
 
+
 2. **Configure and Commit config.yaml**
 
    - Copy `config.advanced.yaml` to `config.yaml`
@@ -98,13 +99,35 @@ For full control over advanced settings like VLM parsing, embedder rating and cu
      - `prompts/rate_emb/` - Embedding query for relevance filtering
      - `prompts/parse_vlm/` - VLM parsing instructions
 
-4. **Configure Required Secrets**
+4. **Configure Secrets and Variables**
 
-   - Only set secrets for sensitive data referenced in your `config.yaml`
-   - Use any of the allowed secret names from the workflow
+   Configure your repository with secrets and variables for maximum flexibility:
 
-**Allowed Secret Names** (from main.yml environment):
+   **Repository Secrets** (for sensitive data):
+   - Use for API keys, passwords, and any sensitive information
+   - Limited to predefined secret names listed below
+   - Reference in config.yaml with `sec:` prefix: `api_key: sec:API_KEY`
 
+   **Repository Variables** (for flexible configuration):
+   - Use for settings you want to change without committing code
+   - Support any variable name you choose
+   - Reference in config.yaml with `var:` prefix: `max_results: var:FETCH_RESULTS`
+
+**Example Usage:**
+```yaml
+fetch:
+  max_results: var:FETCH_RESULTS    # Repository variable
+  days: var:CUSTOM_DAYS           # Repository variable
+
+summarize:
+  model: var:MY_SUMMARIZER_MODEL  # Repository variable
+  api_key: sec:API_KEY            # Repository secret
+
+rate:
+  max_selected: var:MAX_PAPERS    # Repository variable
+```
+
+**Allowed Secret Names** (predefined in workflow):
 ```secrets
 # LLM Provider Keys
 OPENAI_API_KEY, DEEPSEEK_API_KEY, MODELSCOPE_API_KEY, DASHSCOPE_API_KEY
@@ -116,9 +139,6 @@ SUMMARIZER_API_KEY, RATER_API_KEY, EMBEDDER_API_KEY, VLM_API_KEY, LLM_API_KEY, A
 
 # Email Configuration
 SMTP_PASSWORD, SENDER_EMAIL, RECIPIENT_EMAIL, SMTP_SERVER, SMTP_PORT
-
-# Configuration Variables
-ARXIV_CATEGORIES, MAX_PAPERS, OUTPUT_FORMATS, RATING_STRATEGY
 ```
 
 ### Method 2: Local Setup with Git Clone
