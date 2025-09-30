@@ -30,7 +30,7 @@ summarize:
 
 rate:
   strategy: hybrid
-  top_k: 128
+  top_k: 96
   max_selected: 5
   embedder:
     provider: zhipu
@@ -45,7 +45,7 @@ rate:
     api_key: var:ZHIPU_API_KEY
     base_url: https://open.bigmodel.cn/api/paas/v4
     model: glm-4.5-flash
-    batch: true
+    batch: false
     system_prompt: file:./prompts/rate_lm/system.md
     user_prompt_template: file:./prompts/rate_lm/user.md
     completion_options:
@@ -78,7 +78,7 @@ parse:
     api_key: var:ZHIPU_API_KEY
     base_url: https://open.bigmodel.cn/api/paas/v4
     model: glm-4v-flash
-    batch: true
+    batch: false
     system_prompt: file:./prompts/parse_vlm/system.md
     user_prompt: file:./prompts/parse_vlm/user.md
     complete_options:

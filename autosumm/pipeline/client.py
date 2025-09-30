@@ -297,7 +297,7 @@ class BaseClient(ABC):
             return self._parse_response(response_content)
         except Exception as e:
             logger.error(f"Failed to process input: {e}", exc_info=True)
-            return ""
+            return None
 
 def count_tokens(text: str) -> int:
     encoding = tiktoken.get_encoding("cl100k_base")

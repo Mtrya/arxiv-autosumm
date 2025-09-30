@@ -181,8 +181,8 @@ class RaterEmbedderClient(BaseClient):
     def process_single(self, input_data, sleep_time = 0.0):
         """Process single input, raising exception on failure."""
         result = super().process_single(input_data, sleep_time)
-        if result == "": # error from base client, turn to int
-            return 0.0
+        if result is None: # error from base client
+            return None
         return result
               
 class RaterLLMClient(BaseClient):
@@ -252,7 +252,7 @@ class RaterLLMClient(BaseClient):
                 
         except Exception as e:
             #print(f"error parsing response {response}: {e}")
-            return 0.0
+            return None
         
         return final_score
 
@@ -277,8 +277,8 @@ class RaterLLMClient(BaseClient):
     def process_single(self, input_data, sleep_time = 10.0):
         """Process single input, raising exception on failure."""
         result = super().process_single(input_data, sleep_time)
-        if result == "": # error from base client, turn to int
-            return 0.0
+        if result is None: # error from base client
+            return None
         return result
 
 def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Optional[BatchConfig]=None) -> List[RateResult]:
@@ -316,7 +316,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
                 logger.debug(f"Processed chunked paper with {len(chunks)} chunks")
             
             results.append(RateResult(
-                score=similarity_score or 0.0,
+                score=similarity_score if similarity_score is not None else 0.0,
                 success=similarity_score is not None,
                 error=None if similarity_score is not None else "Embedding failed",
                 method="embed"
@@ -342,7 +342,7 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
         results = [client.process_single(content) for content in parsed_contents]
         final_results = [
             RateResult(
-                score=result or 0.0,
+                score=result if result is not None else 0.0,
                 success=result is not None,
                 error=None if result is not None else "Single processing failed for this item.",
                 method="llm_single"
@@ -357,7 +357,7 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
 
         final_results = [
             RateResult(
-                score=result or 0.0,
+                score=result if result is not None else 0.0,
                 success=result is not None,
                 error=None if result is not None else "Batch processing failed for this item.",
                 method="llm_batch"
