@@ -58,7 +58,7 @@ class BaseClient(ABC):
         try:
             response.raise_for_status()
         except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP Error: {e}", exc_info=True)
+            logger.error(f"HTTP Error: {e}")
             logger.error(f"Response status code: {response.status_code}")
             logger.error(f"Response text: {response.text}")
             raise
@@ -219,7 +219,7 @@ class BaseClient(ABC):
                             results[custom_id] = content
                         
                 except (json.JSONDecodeError, KeyError) as e:
-                    logger.warning(f"Failed to parse result line: {e}", exc_info=True)
+                    logger.warning(f"Failed to parse result line: {e}")
                     continue
         
         # Return results in original order
@@ -250,7 +250,7 @@ class BaseClient(ABC):
                 if individual_result is not None:
                     logger.info(f"Successfully recovered item {idx} via individual processing")
             except Exception as e:
-                logger.error(f"Individual retry failed for item {idx}: {e}", exc_info=True)
+                logger.error(f"Individual retry failed for item {idx}: {e}")
 
         return final_results
     
@@ -296,7 +296,7 @@ class BaseClient(ABC):
             response_content = self._make_sync_request(payload)
             return self._parse_response(response_content)
         except Exception as e:
-            logger.error(f"Failed to process input: {e}", exc_info=True)
+            logger.error(f"Failed to process input: {e}")
             return None
 
 def count_tokens(text: str) -> int:

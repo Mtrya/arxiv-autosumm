@@ -1,50 +1,35 @@
 run:
   categories:
   - cs.AI
-  - cs.CV
-  - cs.AI
-  - cs.RO
-  - math.OC
-  - cs.RO
-  - cs.CV
   - cs.RO
   send_log: true
   log_dir: ./logs
 
 fetch:
-  days: 16
-  max_results: 576
+  days: 5
+  max_results: 128
   max_retries: 10
 
 summarize:
-  provider: dashscope
-  api_key: var:DASHSCOPE_API_KEY
-  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
-  model: qwen3-max
-  batch: true
+  provider: openrouter
+  api_key: var:OPENROUTER_API_KEY
+  base_url: https://openrouter.ai/api/v1
+  model: openai/gpt-5
+  batch: false
   system_prompt: file:./prompts/summ_lm/system.md
   user_prompt_template: file:./prompts/summ_lm/user.md
   completion_options:
     temperature: 1.0
-  context_length: 245760
+  context_length: 400000
 
 rate:
-  strategy: hybrid
-  top_k: 96
+  strategy: llm
   max_selected: 5
-  embedder:
-    provider: zhipu
-    api_key: var:ZHIPU_API_KEY
-    base_url: https://open.bigmodel.cn/api/paas/v4
-    model: embedding-3
-    query_template: file:./prompts/rate_emb/query.md
-    user_interests: "Embodied AI, Artificial intelligence and Astronomy"
-    context_length: 8000
   llm:
-    provider: zhipu
-    api_key: var:ZHIPU_API_KEY
-    base_url: https://open.bigmodel.cn/api/paas/v4
-    model: glm-4.5-flash
+    provider: openrouter
+    api_key: var:OPENROUTER_API_KEY
+    base_url: https://openrouter.ai/api/v1
+    model: nvidia/nemotron-nano-9b-v2:free
     batch: false
     system_prompt: file:./prompts/rate_lm/system.md
     user_prompt_template: file:./prompts/rate_lm/user.md
@@ -70,25 +55,13 @@ rate:
         weight: 0.1
 
 parse:
-  enable_vlm: true
+  enable_vlm: false
   tmp_dir: ./tmp
   fast_parser_timeout_seconds: 300
-  vlm:
-    provider: zhipu
-    api_key: var:ZHIPU_API_KEY
-    base_url: https://open.bigmodel.cn/api/paas/v4
-    model: glm-4v-flash
-    batch: false
-    system_prompt: file:./prompts/parse_vlm/system.md
-    user_prompt: file:./prompts/parse_vlm/user.md
-    complete_options:
-      temperature: 0.3
-    dpi: 200
 
 render:
   formats:
   - pdf
-  - md
   output_dir: ./output
   base_filename: null
 

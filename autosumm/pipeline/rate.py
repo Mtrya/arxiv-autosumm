@@ -295,7 +295,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
             if token_count <= embedder_client.context_length:
                 # Text fits, get similarity directly
                 similarity_score = embedder_client.process_single(content)
-                logger.debug(f"Processed paper with {token_count} tokens")
+                logger.debug(f"Rated paper with embedder({token_count} tokens)")
             else:
                 # Text too long, chunk and get weighted average
                 chunks = chunk_text(content, embedder_client.context_length)
@@ -319,7 +319,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
                     weighted_similarity = None
                 
                 similarity_score = weighted_similarity
-                logger.debug(f"Processed chunked paper with {len(chunks)} chunks")
+                logger.debug(f"Rated paper with embedder ({len(chunks)} chunks)")
             
             results.append(RateResult(
                 score=similarity_score if similarity_score is not None else 0.0,
@@ -345,15 +345,18 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
     logger.info(f"Starting LLM-based rating for {len(parsed_contents)} papers (batch={getattr(config.llm, 'batch', False)})")
     if not getattr(config.llm, 'batch', False):
         client = RaterLLMClient(config.llm,batch_config)
-        results = [client.process_single(content) for content in parsed_contents]
-        final_results = [
-            RateResult(
-                score=result if result is not None else 0.0,
-                success=result is not None,
-                error=None if result is not None else "Single processing failed for this item.",
-                method="llm_single"
-            ) for result in results
-        ]
+        final_results = []
+        for content in parsed_contents:
+            result = client.process_single(content)
+            final_results.append(
+                RateResult(
+                    score=result if result is not None else 0.0,
+                    success=result is not None,
+                    error=None if result is not None else "Single processing failed for this item.",
+                    method="llm_single"
+                )
+            )
+            logger.debug(f"Rated paper with llm.")
         logger.info(f"LLM rating completed: {len([r for r in final_results if r.success])} successful")
         return final_results
 
