@@ -31,25 +31,70 @@ class BaseClient(ABC):
         """Build API payload for a single request. Must be implemented by subclasses."""
         pass
 
-    @abstractmethod
-    def _parse_response(self, response_content: str) -> Any:
-        """Parse API response content. Must be implemented by subclasses."""
-        pass
+    def _convert_payload_for_anthropic(self, openai_payload: dict) -> dict:
+        """Convert OpenAI-style payload to Anthropic format."""
+        anthropic_payload = {}
 
-    @abstractmethod
-    def _get_endpoint_url(self) -> str:
-        """Get the appropriate endpoint URL for the provider."""
-        pass
+        # Handle model
+        if "model" in openai_payload:
+            anthropic_payload["model"] = openai_payload["model"]
 
-    def _get_headers(self) -> dict:
-        """Get common headers for API requests."""
-        headers = {"Content-Type": "application/json"}
-        if self.config.api_key:
-            headers["Authorization"] = f"Bearer {self.config.api_key}"
-        return headers
-    
+        # Handle max_tokens (Anthropic requires this)
+        if "max_tokens" in openai_payload:
+            anthropic_payload["max_tokens"] = openai_payload["max_tokens"]
+        else:
+            anthropic_payload["max_tokens"] = 4096  # Default for Anthropic
+
+        # Handle messages (convert OpenAI format to Anthropic format)
+        if "messages" in openai_payload:
+            anthropic_messages = []
+            for msg in openai_payload["messages"]:
+                if msg["role"] == "system":
+                    # Anthropic handles system messages differently
+                    anthropic_payload["system"] = msg["content"]
+                elif msg["role"] in ["user", "assistant"]:
+                    # Anthropic requires content to be in content blocks format
+                    anthropic_messages.append({
+                        "role": msg["role"],
+                        "content": [{"type": "text", "text": msg["content"]}]
+                    })
+            anthropic_payload["messages"] = anthropic_messages
+
+        # Handle temperature (Anthropic accepts this)
+        if "temperature" in openai_payload:
+            anthropic_payload["temperature"] = openai_payload["temperature"]
+
+        # Handle stop sequences (convert from OpenAI 'stop' parameter)
+        if "stop" in openai_payload:
+            if isinstance(openai_payload["stop"], str):
+                anthropic_payload["stop_sequences"] = [openai_payload["stop"]]
+            elif isinstance(openai_payload["stop"], list):
+                anthropic_payload["stop_sequences"] = openai_payload["stop"]
+
+        # Handle top_p (Anthropic accepts this)
+        if "top_p" in openai_payload:
+            anthropic_payload["top_p"] = openai_payload["top_p"]
+
+        # Handle streaming
+        if "stream" in openai_payload:
+            anthropic_payload["stream"] = openai_payload["stream"]
+
+        return anthropic_payload
+
+    def _is_anthropic_provider(self) -> bool:
+        """Check if the provider is Anthropic."""
+        return self.config.provider.lower() == "anthropic"
+
+    def _is_ollama_provider(self) -> bool:
+        """Check if the provider is Ollama."""
+        return self.config.provider.lower() == "ollama"
+
     def _make_sync_request(self, payload: dict) -> str:
         """Make a synchronous API request."""
+        # Convert payload format if needed
+        if self._is_anthropic_provider():
+            payload = self._convert_payload_for_anthropic(payload)
+
         headers = self._get_headers()
         endpoint = self._get_endpoint_url()
 
@@ -63,11 +108,35 @@ class BaseClient(ABC):
             logger.error(f"Response text: {response.text}")
             raise
 
-        if "ollama" in self.config.provider.lower():
+        if self._is_ollama_provider():
             return self._handle_ollama_response(response, payload.get("stream", False))
+        elif self._is_anthropic_provider():
+            return self._handle_anthropic_response(response, payload.get("stream", False))
         else:
             return self._handle_openai_response(response, payload.get("stream", False))
-        
+
+    @abstractmethod
+    def _parse_response(self, response_content: str) -> Any:
+        """Parse API response content. Must be implemented by subclasses."""
+        pass
+
+    @abstractmethod
+    def _get_endpoint_url(self) -> str:
+        """Get the appropriate endpoint URL for the provider."""
+        pass
+
+    def _get_headers(self) -> dict:
+        """Get common headers for API requests."""
+        headers = {"Content-Type": "application/json"}
+        if self._is_anthropic_provider():
+            if self.config.api_key:
+                headers["x-api-key"] = self.config.api_key
+            headers["anthropic-version"] = "2023-06-01"
+        else:
+            if self.config.api_key:
+                headers["Authorization"] = f"Bearer {self.config.api_key}"
+        return headers
+
     def _handle_ollama_response(self, response, is_streaming: bool) -> str:
         """Handle Ollama API response format."""
         if is_streaming:
@@ -87,6 +156,28 @@ class BaseClient(ABC):
             result = response.json()
             return result['message']['content']
         
+    def _handle_anthropic_response(self, response, is_streaming: bool) -> str:
+        """Handle Anthropic API response format."""
+        if is_streaming:
+            full_response = ""
+            for line in response.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        try:
+                            chunk = json.loads(line[6:])  # Remove 'data: ' prefix
+                            if chunk.get('type') == 'content_block_delta':
+                                if chunk.get('delta', {}).get('text'):
+                                    full_response += chunk['delta']['text']
+                            elif chunk.get('type') == 'message_stop':
+                                break
+                        except json.JSONDecodeError:
+                            continue
+            return full_response.strip()
+        else:
+            result = response.json()
+            return result['content'][0]['text']
+
     def _handle_openai_response(self, response, is_streaming: bool) -> str:
         """Handle OpenAI-compatible API response format."""
         if is_streaming:
@@ -259,11 +350,16 @@ class BaseClient(ABC):
         Process multiple inputs using batch API.
         Returns list of results in same order as inputs.
         """
-        if "ollama in self.config.provider.lower()":
+        if self._is_ollama_provider():
             if self.batch_config.fallback_on_error:
                 return [self.process_single(input_data) for input_data in input_data_list]
             else:
                 raise ValueError("Batch processing not supported for Ollama provider")
+        elif self._is_anthropic_provider():
+            if self.batch_config.fallback_on_error:
+                return [self.process_single(input_data) for input_data in input_data_list]
+            else:
+                raise ValueError("Batch processing not supported for Anthropic provider")
             
         tmp_dir = Path(self.batch_config.tmp_dir)
         tmp_dir.mkdir(parents=True,exist_ok=True)

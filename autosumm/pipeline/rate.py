@@ -224,7 +224,9 @@ class RaterLLMClient(BaseClient):
         return base_payload
     
     def _get_endpoint_url(self) -> str:
-        if "ollama" in self.config.provider.lower():
+        if self.config.provider.lower() == "anthropic":
+            return f"{self.config.base_url.rstrip('/')}/v1/messages"
+        elif self.config.provider.lower() == "ollama":
             return f"{self.config.base_url.rstrip('/')}/api/chat"
         else:
             return f"{self.config.base_url.rstrip('/')}/chat/completions"

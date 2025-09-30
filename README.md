@@ -109,7 +109,7 @@ For full control over advanced settings like VLM parsing, embedder rating and cu
 # LLM Provider Keys
 OPENAI_API_KEY, DEEPSEEK_API_KEY, MODELSCOPE_API_KEY, DASHSCOPE_API_KEY
 SILICONFLOW_API_KEY, ZHIPU_API_KEY, MOONSHOT_API_KEY, MINIMAX_API_KEY
-ANTHROCIC_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, VOLCENGINE_API_KEY
+ANTHROPIC_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, VOLCENGINE_API_KEY
 
 # Custom Function Keys
 SUMMARIZER_API_KEY, RATER_API_KEY, EMBEDDER_API_KEY, VLM_API_KEY, LLM_API_KEY, API_KEY
@@ -288,7 +288,7 @@ crontab -e
 **Local Setup Specific:**
 
 - **Full Control**: Complete customization of all components
-- **Unlimited Execution**: No time or resource constraints
+- **Unlimited Execution**: No time or resource constraints (2000mins/month for GitHub Actions)
 - **Local Debugging**: Complete development environment access
 - **Data Privacy**: All processing and storage remains local (if you use local models)
 
@@ -449,7 +449,6 @@ deliver:
 - **More Providers**: Anthropic API format for Claude
 - **Update README**: Update README with more user-friendly illustrations and configuration instruction
 - **Tune Prompts**: Provide clear and simple entrance for users to tune their custom prompts
-- **Variable Override**: Enable repository variables to override config.yaml to reduce redundant commits
 
 ## 📄 License
 

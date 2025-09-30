@@ -46,7 +46,7 @@ arxiv_categories = ["cs.AI","cs.AR","cs.CC","cs.CE","cs.CG","cs.CL","cs.CR","cs.
                     "q-fin.TR","stat.AP","stat.CO","stat.ME","stat.ML","stat.OT","stat.TH"]
 
 recognized_providers = {
-    "anthrocic": {
+    "anthropic": {
         "base_url": "https://api.anthropic.com",
         "default_summarizer": "claude-opus-4-0",
         "default_rater": "claude-3-5-haiku-latest"
@@ -759,7 +759,12 @@ class MainConfig(BaseModel):
 
     @staticmethod
     def _resolve_references(data: Dict[str,Any]) -> Dict[str, Any]:
-        """Recursively resolve 'file:path', 'env:variable', 'var:variable', and '$variable' references"""
+        """
+        Recursively resolve 'file:path', 'env:variable', 'var:variable', and '$variable' references
+        Note that 'sec:secrets' are also supported, but only if:
+            - secrets are stored as environment variables (local)
+            - secrets have specific namings (GitHub Actions)
+        """
         main.load_dotenv() # load .env file
         if isinstance(data, dict):
             result = {}
@@ -789,6 +794,14 @@ class MainConfig(BaseModel):
                 elif isinstance(value, str) and value.startswith('$'):
                     # $ prefix for bash-style environment variables
                     envname = value[1:]
+                    value = os.getenv(envname)
+                    if value is None:
+                        raise ValueError(f"Environment variable '{envname}' is not set or is empty. Please check your .env file or environment variables.")
+                    else:
+                        result[key] = value
+                elif isinstance(value, str) and value.startswith('sec:'):
+                    # sec: prefix for environment variables
+                    envname = value[4:]
                     value = os.getenv(envname)
                     if value is None:
                         raise ValueError(f"Environment variable '{envname}' is not set or is empty. Please check your .env file or environment variables.")

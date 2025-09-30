@@ -7,51 +7,57 @@ run:
 
 fetch:
   days: 5
-  max_results: 128
+  max_results: var:FETCH_RESULTS
   max_retries: 10
 
 summarize:
-  provider: openrouter
-  api_key: var:OPENROUTER_API_KEY
-  base_url: https://openrouter.ai/api/v1
-  model: openai/gpt-5
+  provider: var:PROVIDER
+  api_key: sec:OPENROUTER_API_KEY
+  base_url: null
+  model: var:STRONG_MODEL
   batch: false
   system_prompt: file:./prompts/summ_lm/system.md
   user_prompt_template: file:./prompts/summ_lm/user.md
   completion_options:
     temperature: 1.0
-  context_length: 400000
+  context_length: 200000
 
 rate:
   strategy: llm
-  max_selected: 5
+  max_selected: var:FINAL_RESULTS
   llm:
-    provider: openrouter
-    api_key: var:OPENROUTER_API_KEY
-    base_url: https://openrouter.ai/api/v1
-    model: nvidia/nemotron-nano-9b-v2:free
+    provider: var:PROVIDER
+    api_key: sec:OPENROUTER_API_KEY
+    base_url: null
+    model: var:FAST_MODEL
     batch: false
     system_prompt: file:./prompts/rate_lm/system.md
     user_prompt_template: file:./prompts/rate_lm/user.md
     completion_options:
       temperature: 0.2
-      max_tokens: 1024
-    context_length: 122880
+      max_tokens: 2048
+    context_length: 100000
     criteria:
       novelty:
         description: How original and innovative are the contributions?
         weight: 0.3
-      methodology:
-        description: How rigorous is the experimental design and evaluation?
+      code/data-availability:
+        description: Are implementations and datasets publicly available?
         weight: 0.25
       clarity:
         description: How well-written and understandable is the paper?
-        weight: 0.2
-      relevance:
-        description: How relevant is this paper to your research interests?
+        weight: 0.25
+      paradigm-shift-potential:
+        description: Could this change how the field thinks?
         weight: 0.15
-      impact:
-        description: What is the potential impact of this work?
+      fun-and-curiosity:
+        description: How enjoyable would it be to code this? How much it makes you want to explore further?
+        weight: 0.1
+      conceptual-elegance:
+        description: How beautiful is the approach, mathematics or the idea?
+        weight: 0.1
+      reputation:
+        description: Give preference to research from well-known labs or organizations
         weight: 0.1
 
 parse:
@@ -73,5 +79,5 @@ deliver:
   smtp_server: smtp.163.com
   port: 465
   sender: arxiv_bot@163.com
-  recipient: var:RECIPIENT_EMAIL
-  password: var:SMTP_PASSWORD
+  recipient: sec:RECIPIENT_EMAIL
+  password: sec:SMTP_PASSWORD
