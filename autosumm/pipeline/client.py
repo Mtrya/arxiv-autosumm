@@ -384,7 +384,7 @@ class BaseClient(ABC):
 
         return final_results
 
-    def process_single(self, input_data: Any, sleep_time: float=5) -> Optional[str]:
+    def process_single(self, input_data: Any, sleep_time: float=0) -> Optional[str]:
         """Process single input synchronously"""
         time.sleep(sleep_time)
         try:

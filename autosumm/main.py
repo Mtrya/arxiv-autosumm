@@ -302,9 +302,6 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
             categories = config["categories"]
             category = categories[int(today.strftime('%j')) % len(categories)]
         logger.info(f"Processing category: {category} for date {today}")
-        
-        print('-'*50)
-        print(config["fetch"].max_results)
 
         # 2&3. Fetch paper metadata and get cached ratings
         logger.info("Fetching new papers...")

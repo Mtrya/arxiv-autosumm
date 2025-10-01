@@ -2,7 +2,7 @@ run:
   categories:
   - cs.AI
   - cs.RO
-  send_log: true
+  send_log: false
   log_dir: ./logs
 
 fetch:

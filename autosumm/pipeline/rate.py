@@ -203,6 +203,7 @@ class RaterLLMClient(BaseClient):
         """Build API payload for rating request."""
         token_count = count_tokens(parsed_content)
         if token_count > self.available_context:
+            logger.warning(f"Content too long ({token_count} tokens), truncated to {self.available_context} tokens.")
             parsed_content = truncate_to_tokens(parsed_content, self.available_context)
         
         messages = self._create_messages(parsed_content)
@@ -276,7 +277,7 @@ class RaterLLMClient(BaseClient):
         messages.append({"role": "user", "content": user_content})
         return messages
 
-    def process_single(self, input_data, sleep_time = 10.0):
+    def process_single(self, input_data, sleep_time = 2.0):
         """Process single input, raising exception on failure."""
         result = super().process_single(input_data, sleep_time)
         if result is None: # error from base client
@@ -297,7 +298,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
             if token_count <= embedder_client.context_length:
                 # Text fits, get similarity directly
                 similarity_score = embedder_client.process_single(content)
-                logger.debug(f"Rated paper with embedder({token_count} tokens)")
+                logger.debug(f"Rated paper with embedder ({token_count} tokens)")
             else:
                 # Text too long, chunk and get weighted average
                 chunks = chunk_text(content, embedder_client.context_length)
@@ -349,6 +350,7 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
         client = RaterLLMClient(config.llm,batch_config)
         final_results = []
         for content in parsed_contents:
+            token_count = count_tokens(content)
             result = client.process_single(content)
             final_results.append(
                 RateResult(
@@ -358,7 +360,7 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
                     method="llm_single"
                 )
             )
-            logger.debug(f"Rated paper with llm.")
+            logger.debug(f"Rated paper with llm ({token_count} tokens)")
         logger.info(f"LLM rating completed: {len([r for r in final_results if r.success])} successful")
         return final_results
 

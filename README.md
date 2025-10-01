@@ -238,7 +238,7 @@ Create a systemd service and timer for modern, reliable scheduling:
 
 ```bash
 # Create systemd service file
-sudo tee /etc/systemd/system/arxiv-autosumm.service > /dev/null << 'EOF'
+sudo tee ~/.config/systemd/user/arxiv-autosumm.service > /dev/null << 'EOF'
 [Unit]
 Description=ArXiv AutoSumm Service
 After=network.target
@@ -246,14 +246,14 @@ After=network.target
 [Service]
 Type=oneshot
 User=your-username
-WorkingDirectory=/path/to/arxiv-autosumm
-ExecStart=/usr/bin/python -m autosumm.cli run
+WorkingDirectory=/path/to/arxiv-autosumm # replace with real directory
+ExecStart=/usr/bin/python -m autosumm.cli run # replace with your python path
 StandardOutput=journal
 StandardError=journal
 EOF
 
 # Create systemd timer file
-sudo tee /etc/systemd/system/arxiv-autosumm.timer > /dev/null << 'EOF'
+sudo tee ~/.config/systemd/user/arxiv-autosumm.timer > /dev/null << 'EOF'
 [Unit]
 Description=ArXiv AutoSumm Timer
 Requires=arxiv-autosumm.service
@@ -301,7 +301,7 @@ crontab -e
 
 **GitHub Actions Specific:**
 
-- **No Infrastructure Management**: GitHub provides all computing resources
+- **No Infrastructure Management**: GitHub provides all resources
 - **Built-in Monitoring**: Automatic logging and execution history
 - **Easy Deployment**: Fork repository, configure secrets, and run
 - **Two Configuration Options**: Dynamic (secrets-based) or repository-based
@@ -436,8 +436,8 @@ render:
 deliver:
   smtp_server
   port: 465
-  sender: env:SENDER
-  recipient: env:RECIPIENT
+  sender: env:SENDER_EMAIL
+  recipient: env:RECIPIENT_EMAIL
   password: env:SMTP_PASSWORD
 ```
 
@@ -445,15 +445,15 @@ deliver:
 
 | Provider | Example Model | Notes |
 |----------|---------------|--------|
-| **OpenAI** | gpt-4o, gpt-4o-mini | Requires OPENAI_API_KEY |
+| **OpenAI** | gpt-5, gpt-4.1 | Requires OPENAI_API_KEY |
 | **DeepSeek** | deepseek-reasoner | Requires DEEPSEEK_API_KEY |
-| **DashScope** | qwen-plus, qwen-turbo | Requires DASHSCOPE_API_KEY |
+| **DashScope** | qwen-max, qwen-turbo | Requires DASHSCOPE_API_KEY |
 | **SiliconFlow** | deepseek-ai/DeepSeek-R1 | Requires SILICONFLOW_API_KEY |
 | **Ollama** | qwen3:32b, llama3.1:8b | Requires Local Installation |
 | **Moonshot** | kimi-k2-0711-preview | Requires MOONSHOT_API_KEY |
 | **Minimax** | MiniMax-Text-01 | Requires MINIMAX_API_KEY |
 | **ModelScope** | Qwen/Qwen3-235B-A22B-Thinking-2507 | Requires MODELSCOPE_API_KEY |
-| **Zhipu** | glm-4.5, glm-4.5-flash | Requires ZHIPU_API_KEY |
+| **Zhipu** | glm-4.6, glm-4.5-flash | Requires ZHIPU_API_KEY |
 | **VolcEngine** | doubao-1.6-seed-thinking | Requires ARK_API_KEY |
 
 ### Advanced Configuration
