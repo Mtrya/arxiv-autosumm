@@ -367,7 +367,7 @@ Your mission and your only mission is to analyze the image document and return i
     batch_config = BatchConfig(
         tmp_dir="./tmp",
         max_wait_hours=24,
-        poll_intervall_seconds=30,
+        poll_interval_seconds=30,
         fallback_on_error=True
     )
     config = ParserConfig(

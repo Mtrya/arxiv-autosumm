@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class BatchConfig:
     tmp_dir: str
     max_wait_hours: int
-    poll_intervall_seconds: int
+    poll_interval_seconds: int
     fallback_on_error: bool
 
 class BaseClient(ABC):

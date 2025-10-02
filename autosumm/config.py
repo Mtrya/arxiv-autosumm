@@ -544,7 +544,7 @@ class BatchConfig(BaseModel):
         return BatchConfig_(
             tmp_dir=self.tmp_dir,
             max_wait_hours=self.max_wait_hours,
-            poll_intervall_seconds=self.poll_interval_seconds,
+            poll_interval_seconds=self.poll_interval_seconds,
             fallback_on_error=self.fallback_on_error
         )
 

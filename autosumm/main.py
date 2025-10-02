@@ -397,7 +397,7 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
             if log_file_path and config.get("send_log"):
                 try:
                     logger.info(f"Attempting to deliver error log: {log_file_path}")
-                    for handler in logging.getLogger().handlers():
+                    for handler in logging.getLogger().handlers:
                         handler.flush()
                     deliver([log_file_path],config["deliver"],"[ERROR] in ArXiv Summary Pipeline")
                 except Exception as deliver_e:

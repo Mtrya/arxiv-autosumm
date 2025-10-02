@@ -63,11 +63,10 @@ This approach automatically generates configuration from repository secrets - no
 
    - **Manual**: Go to Actions → "ArXiv AutoSumm Daily" → "Run workflow"
    - **Scheduled**: Runs automatically daily at 22:00 UTC
-   - **Test Mode**: Check "Run in test mode" for limited processing
 
 #### Option B: Repository Configuration (Advanced)
 
-For full control over advanced settings like VLM parsing, embedder rating and custom configurations, we recommend using `config.py` in the repository.
+For full control over advanced settings like VLM parsing, embedder rating and custom configurations, we recommend using `config.yaml` in the repository.
 
 **Prerequisites:**
 
@@ -151,6 +150,7 @@ Full local control over execution timing and configuration.
 **System Requirements:**
 
 - Git
+- Python 3.11+
 - System dependencies (based on desired output formats)
 
 **Optional System Dependencies:**
@@ -220,10 +220,10 @@ sudo apt-get install texlive-latex-base texlive-latex-extra texlive-xetex pandoc
    ```bash
    # Normal execution
    autosumm run
-   
+
    # Verbose output
    autosumm run --verbose
-   
+
    # Single category only
    autosumm run --specify-category cs.AI
    ```
@@ -298,6 +298,8 @@ crontab -e
 - **Multiple Output Formats**: PDF, HTML, Markdown, AZW3 (Kindle)
 - **Advanced Caching**: SQLite-based deduplication to avoid redundant processing
 - **Email Delivery**: SMTP configuration with attachment support
+- **Multiple Rating Strategies**: LLM-based, embedding-based, or hybrid approach
+- **VLM Parsing**: Optional Vision Language Model support for enhanced PDF parsing
 
 **GitHub Actions Specific:**
 
@@ -305,11 +307,12 @@ crontab -e
 - **Built-in Monitoring**: Automatic logging and execution history
 - **Easy Deployment**: Fork repository, configure secrets, and run
 - **Two Configuration Options**: Dynamic (secrets-based) or repository-based
+- **Universal Repository Variables**: Flexible configuration without code changes
 
 **Local Setup Specific:**
 
 - **Full Control**: Complete customization of all components
-- **Unlimited Execution**: No time or resource constraints (2000mins/month for GitHub Actions)
+- **Unlimited Execution**: No time or resource constraints
 - **Local Debugging**: Complete development environment access
 - **Data Privacy**: All processing and storage remains local (if you use local models)
 
@@ -335,7 +338,7 @@ You can configure three different rating approaches based on your needs:
 
 - **llm**: Uses only LLM rating (most accurate, higher cost)
 - **embedder**: Uses only embedding similarity (faster, lower cost)
-- **hybrid**: Uses embedder -> LLM hierarchical rating (balanced approach)
+- **hybrid**: Uses embedder → LLM hierarchical rating (balanced approach)
 
 Configure in `config.yaml`:
 
@@ -361,7 +364,7 @@ rate:
 run:
   categories: ["cs.AI", "cs.RO"] # arxiv categories you're interested in.
   send_log: false # whether to deliver logfile as well as summaries
-  log_dir: ./logs # where to store logfiles  
+  log_dir: ./logs # where to store logfiles
 ```
 
 #### Fetch
@@ -455,20 +458,70 @@ deliver:
 | **ModelScope** | Qwen/Qwen3-235B-A22B-Thinking-2507 | Requires MODELSCOPE_API_KEY |
 | **Zhipu** | glm-4.6, glm-4.5-flash | Requires ZHIPU_API_KEY |
 | **VolcEngine** | doubao-1.6-seed-thinking | Requires ARK_API_KEY |
+| **Anthropic** | claude-3.5-sonnet | Requires ANTHROPIC_API_KEY |
 
 ### Advanced Configuration
 
-#### Coming soon
+#### VLM Parsing
+
+For enhanced PDF parsing using Vision Language Models:
+
+```yaml
+parse:
+  vlm:
+    enabled: true
+    provider: modelscope
+    model: Qwen/Qwen2-VL-72B-Instruct
+    api_key: env:VLM_API_KEY
+    system_prompt: file:./prompts/parse_vlm/system.md
+    user_prompt_template: file:./prompts/parse_vlm/user.md
+```
+
+#### Embedder Configuration
+
+For similarity-based paper filtering:
+
+```yaml
+rate:
+  strategy: hybrid
+  embedder:
+    provider: modelscope
+    model: BAAI/bge-large-en-v1.5
+    api_key: env:EMBEDDER_API_KEY
+    query_prompt: file:./prompts/rate_emb/query.md
+```
+
+## CLI Commands
+
+The `autosumm` CLI provides commands for pipeline management:
+
+```bash
+# Run the complete pipeline
+autosumm run [--config path/to/config.yaml] [--verbose] [--test] [--specify-category CATEGORY]
+
+# Test configuration and dependencies
+autosumm run --test [--config path/to/config.yaml] [--verbose]
+
+# Prompt tuning interface (coming soon)
+autosumm tune [--config path/to/config.yaml] [--category CATEGORY]
+
+# Show help
+autosumm --help
+autosumm [command] --help
+```
+
+### Command Options
+
+- `--config, -c`: Path to configuration file (default: `config.yaml`)
+- `--verbose, -v`: Enable verbose output with detailed logging
+- `--test, -t`: Test configuration and dependencies only (no pipeline execution)
+- `--specify-category, -s`: Process only specified ArXiv category (single category only)
 
 ## 🚨 Known Limitations
 
 - **Rate limiting**: Some providers may have aggressive rate limits
 - **VLM Parsing**: Enabling VLM parsing may require significant time and tokens, especially for large PDFs, and the parsing quality is not guaranteed (rely on the specific model and prompts)
-
-## Future Plan
-
-- **Update README**: Update README with more user-friendly illustrations and configuration instruction
-- **Prompt Tuning Entrance**: Provide clear and simple entrance for users to tune their custom prompts
+- **Processing Time**: Large paper collections may take considerable time to process depending on chosen models and strategies
 
 ## 📄 License
 
