@@ -85,7 +85,7 @@ GitHub Actions 提供自动化定时执行，无需维护本地基础设施。�
 
    - 将 `config.advanced.yaml` 复制为 `config.yaml`
    - **将所有设置直接写入 config.yaml**：分类、模型、输出格式等
-   - **仅对敏感数据使用密钥引用**：`api_key: sec:API_KEY`
+   - **仅对敏感数据使用环境变量引用**：`api_key: env:API_KEY`
    - 将 `config.yaml` 提交到您的仓库
 
 3. **自定义提示词（可选）**

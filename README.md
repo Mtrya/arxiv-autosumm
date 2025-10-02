@@ -84,7 +84,7 @@ For full control over advanced settings like VLM parsing, embedder rating and cu
 
    - Copy `config.advanced.yaml` to `config.yaml`
    - **Put all settings directly in config.yaml**: categories, models, output formats, etc.
-   - **Only use secret references for sensitive data**: `api_key: sec:API_KEY`
+   - **Only use environment variables for sensitive data**: `api_key: env:API_KEY`
    - Commit `config.yaml` to your repository
 
 3. **Customize Prompts (Optional)**
@@ -101,32 +101,38 @@ For full control over advanced settings like VLM parsing, embedder rating and cu
 
    Configure your repository with secrets and variables for maximum flexibility:
 
-   **Repository Secrets** (for sensitive data):
-   - Use for API keys, passwords, and any sensitive information
-   - Limited to predefined secret names listed below
-   - Reference in config.yaml with `sec:` prefix: `api_key: sec:API_KEY`
+   **Environment Variables** (for all configuration):
+   - Use for API keys, passwords, and any settings
+   - Reference in config.yaml with `env:` prefix: `api_key: env:API_KEY`
 
-   **Repository Variables** (for flexible configuration):
-   - Use for settings you want to change without committing code
+   Two types of environment variables are supported:
+
+   **Repository Secrets** (sensitive data):
+   - Limited to predefined secret names in GitHub Actions workflow
+   - Use for API keys, passwords, and sensitive information
+   - Reference with `env:` prefix: `api_key: env:OPENAI_API_KEY`
+
+   **Repository Variables** (flexible configuration):
    - Support any variable name you choose
-   - Reference in config.yaml with `var:` prefix: `max_results: var:FETCH_RESULTS`
+   - Use for settings you want to change without committing code
+   - Also reference with `env:` prefix: `max_results: env:FETCH_RESULTS`
 
 **Example Usage:**
 
 ```yaml
 fetch:
-  max_results: var:FETCH_RESULTS    # Repository variable
-  days: var:CUSTOM_DAYS           # Repository variable
+  max_results: env:FETCH_RESULTS    # Repository variable (any name)
+  days: env:CUSTOM_DAYS           # Repository variable (any name)
 
 summarize:
-  model: var:MY_SUMMARIZER_MODEL  # Repository variable
-  api_key: sec:API_KEY            # Repository secret
+  model: env:MY_SUMMARIZER_MODEL  # Repository variable (any name)
+  api_key: env:OPENAI_API_KEY     # Repository secret (predefined name)
 
 rate:
-  max_selected: var:MAX_PAPERS    # Repository variable
+  max_selected: env:MAX_PAPERS    # Repository variable (any name)
 ```
 
-**Allowed Secret Names** (predefined in workflow):
+**Allowed Secret Names** (predefined in GitHub Actions workflow):
 
 ```secrets
 # LLM Provider Keys
@@ -140,6 +146,12 @@ SUMMARIZER_API_KEY, RATER_API_KEY, EMBEDDER_API_KEY, VLM_API_KEY, LLM_API_KEY, A
 # Email Configuration
 SMTP_PASSWORD, SENDER_EMAIL, RECIPIENT_EMAIL, SMTP_SERVER, SMTP_PORT
 ```
+
+**Important Note:**
+
+- For **secrets** (API keys, passwords): Use only the predefined names above
+- For **variables** (settings, preferences): Use any name you want
+- Both are referenced with the same `env:` prefix in config.yaml
 
 ### Method 2: Local Setup with Git Clone
 

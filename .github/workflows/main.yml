@@ -69,8 +69,7 @@ jobs:
           USE_REPO_CONFIG_VALUE="${{ secrets.USE_REPO_CONFIG }}"
         fi
 
-        echo "DEBUG: Final USE_REPO_CONFIG value: '$USE_REPO_CONFIG_VALUE'"
-
+        
         if [ "$USE_REPO_CONFIG_VALUE" = "true" ] && [ -f "config.yaml" ]; then
           echo "USING_REPO_CONFIG=true" >> $GITHUB_OUTPUT
           echo "Using existing config.yaml from repository"
@@ -220,6 +219,22 @@ jobs:
       run: |
         mkdir -p ~/.cache/arxiv-autosumm/
 
+    - name: Extract output directory from config
+      id: extract_output
+      run: |
+        if [ -f "config.yaml" ]; then
+          # Try to extract output_dir from render section
+          OUTPUT_DIR=$(grep -A5 "render:" config.yaml | grep "output_dir" | sed 's/.*output_dir: *//' | tr -d '"' | tr -d "'" || echo "./output")
+          # Fallback to ./output if extraction fails
+          if [ -z "$OUTPUT_DIR" ]; then
+            OUTPUT_DIR="./output"
+          fi
+        else
+          OUTPUT_DIR="./output"
+        fi
+        echo "OUTPUT_DIR=$OUTPUT_DIR" >> $GITHUB_ENV
+        echo "Extracted output directory: $OUTPUT_DIR"
+
     - name: Export all repository variables as environment variables
       run: |
         # Universal repository variable exporter - works with ANY variable name
@@ -356,7 +371,7 @@ jobs:
       with:
         name: arxiv-summaries-${{ github.run_number }}
         path: |
-          output/T
+          ${{ env.OUTPUT_DIR }}/**/*
           logs/
           config.yaml
         retention-days: 30
@@ -366,20 +381,14 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         tag_name: daily-${{ github.run_number }}
-        name: Daily ArXiv Summaries - ${{ github.run_number }}
+        name: ArXiv Summaries - ${{ github.event.created_at }} - Run ${{ github.run_number }}
         body: |
           Automated ArXiv paper summaries generated on ${{ github.event.created_at }}
-
-          ## Configuration Used
-          - **Categories**: ${{ secrets.ARXIV_CATEGORIES || 'cs.AI,cs.CV,cs.RO' }}
-          - **Max Papers**: ${{ vars.MAX_PAPERS || '10' }}
-          - **Output Formats**: ${{ vars.OUTPUT_FORMATS || 'pdf,md' }}
-          - **Rating Strategy**: ${{ vars.RATING_STRATEGY || 'llm' }}
 
           ## Files
           This release contains the generated summary files for today's ArXiv papers.
         files: |
-          output/**/*
+          ${{ env.OUTPUT_DIR }}/**/*
         draft: false
         prerelease: false
         

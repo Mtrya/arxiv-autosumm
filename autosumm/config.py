@@ -737,7 +737,7 @@ class MainConfig(BaseModel):
                             # The error message from _resolve_references now contains the
                             # full path, so we report it as a single, clear error message.
                             'loc': ('config',),
-                            'msg': str(e) + " check if references ('env:', 'var:', '$', and 'file:') are correctly set",
+                            'msg': str(e) + " check if references ('env:' and 'file:') are correctly set",
                             'input': 'file: or env: reference',
                         }
                     ]
@@ -795,10 +795,8 @@ class MainConfig(BaseModel):
     @staticmethod
     def _resolve_references(data: Dict[str,Any]) -> Dict[str, Any]:
         """
-        Recursively resolve 'file:path', 'env:variable', 'var:variable', and '$variable' references
-        Note that 'sec:secrets' are also supported, but only if:
-            - secrets are stored as environment variables (local)
-            - secrets have specific namings (GitHub Actions)
+        Recursively resolve 'file:path' and 'env:variable' references
+        Environment variables can be used for all configuration values including API keys, passwords, and regular settings.
         """
         main.load_dotenv() # load .env file
         if isinstance(data, dict):
@@ -812,30 +810,6 @@ class MainConfig(BaseModel):
                     except Exception as e:
                         raise ValueError(f"Failed to load file '{filepath}'. Reason: {e}")
                 elif isinstance(value, str) and value.startswith('env:'):
-                    envname = value[4:]
-                    value = os.getenv(envname)
-                    if value is None:
-                        raise ValueError(f"Environment variable '{envname}' is not set or is empty. Please check your .env file or environment variables.")
-                    else:
-                        result[key] = MainConfig._convert_env_value(value)
-                elif isinstance(value, str) and value.startswith('var:'):
-                    # var: prefix for secrets (same as env: but semantically clearer for secrets)
-                    envname = value[4:]
-                    value = os.getenv(envname)
-                    if value is None:
-                        raise ValueError(f"Secret '{envname}' is not set or is empty. Please check your repository secrets or environment variables.")
-                    else:
-                        result[key] = MainConfig._convert_env_value(value)
-                elif isinstance(value, str) and value.startswith('$'):
-                    # $ prefix for bash-style environment variables
-                    envname = value[1:]
-                    value = os.getenv(envname)
-                    if value is None:
-                        raise ValueError(f"Environment variable '{envname}' is not set or is empty. Please check your .env file or environment variables.")
-                    else:
-                        result[key] = MainConfig._convert_env_value(value)
-                elif isinstance(value, str) and value.startswith('sec:'):
-                    # sec: prefix for environment variables
                     envname = value[4:]
                     value = os.getenv(envname)
                     if value is None:

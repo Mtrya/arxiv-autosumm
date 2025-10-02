@@ -7,14 +7,14 @@ run:
 
 fetch:
   days: 5
-  max_results: var:FETCH_RESULTS
+  max_results: env:FETCH_RESULTS
   max_retries: 10
 
 summarize:
-  provider: var:PROVIDER
-  api_key: sec:OPENROUTER_API_KEY
+  provider: env:PROVIDER
+  api_key: env:OPENROUTER_API_KEY
   base_url: null
-  model: var:STRONG_MODEL
+  model: env:STRONG_MODEL
   batch: false
   system_prompt: file:./prompts/summ_lm/system.md
   user_prompt_template: file:./prompts/summ_lm/user.md
@@ -24,12 +24,12 @@ summarize:
 
 rate:
   strategy: llm
-  max_selected: var:FINAL_RESULTS
+  max_selected: env:FINAL_RESULTS
   llm:
-    provider: var:PROVIDER
-    api_key: sec:OPENROUTER_API_KEY
+    provider: env:PROVIDER
+    api_key: env:OPENROUTER_API_KEY
     base_url: null
-    model: var:FAST_MODEL
+    model: env:FAST_MODEL
     batch: false
     system_prompt: file:./prompts/rate_lm/system.md
     user_prompt_template: file:./prompts/rate_lm/user.md
@@ -67,7 +67,8 @@ parse:
 
 render:
   formats:
-  - pdf
+    - pdf
+    - md
   output_dir: ./output
   base_filename: null
 
@@ -79,5 +80,5 @@ deliver:
   smtp_server: smtp.163.com
   port: 465
   sender: arxiv_bot@163.com
-  recipient: sec:RECIPIENT_EMAIL
-  password: sec:SMTP_PASSWORD
+  recipient: env:RECIPIENT_EMAIL
+  password: env:SMTP_PASSWORD
