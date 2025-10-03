@@ -61,9 +61,21 @@ rate:
         weight: 0.1
 
 parse:
-  enable_vlm: false
+  enable_vlm: env:ENABLE_VLM
   tmp_dir: ./tmp
   fast_parser_timeout_seconds: 300
+  vlm:
+    provider: env:PROVIDER
+    api_key: env:OPENROUTER_API_KEY
+    base_url: null
+    model: env:VISION_MODEL
+    batch: false
+    system_prompt: file:./prompts/parse_vlm/system.md
+    user_prompt: file:./prompts/parse_vlm/user.md
+    completion_options:
+      temperature: 0.3
+      max_tokens: 4096
+    dpi: 200
 
 render:
   formats:
