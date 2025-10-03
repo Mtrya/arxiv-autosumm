@@ -6,7 +6,7 @@ run:
   log_dir: ./logs
 
 fetch:
-  days: 5
+  days: env:FETCH_DAYS
   max_results: env:FETCH_RESULTS
   max_retries: 10
 
@@ -14,7 +14,7 @@ summarize:
   provider: env:PROVIDER
   api_key: env:OPENROUTER_API_KEY
   base_url: null
-  model: env:STRONG_MODEL
+  model: env:SMART_MODEL
   batch: false
   system_prompt: file:./prompts/summ_lm/system.md
   user_prompt_template: file:./prompts/summ_lm/user.md

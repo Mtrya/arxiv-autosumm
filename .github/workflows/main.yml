@@ -376,14 +376,21 @@ jobs:
           config.yaml
         retention-days: 30
 
+    - name: Get current date for release
+      if: success() && github.event_name == 'schedule'
+      id: date
+      run: |
+        echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+        echo "formatted_date=$(date +'%B %d, %Y')" >> $GITHUB_OUTPUT
+
     - name: Create Daily Release (scheduled runs only)
       if: success() && github.event_name == 'schedule'
       uses: softprops/action-gh-release@v1
       with:
         tag_name: daily-${{ github.run_number }}
-        name: ArXiv Summaries - ${{ github.event.created_at }} - Run ${{ github.run_number }}
+        name: ArXiv Summaries - ${{ steps.date.outputs.date }} - Run ${{ github.run_number }}
         body: |
-          Automated ArXiv paper summaries generated on ${{ github.event.created_at }}
+          Automated ArXiv paper summaries generated on ${{ steps.date.outputs.formatted_date }}
 
           ## Files
           This release contains the generated summary files for today's ArXiv papers.
