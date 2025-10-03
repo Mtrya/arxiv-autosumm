@@ -11,9 +11,9 @@ from json_repair import repair_json
 import logging
 
 try:
-    from client import BaseClient, BatchConfig, count_tokens, truncate_to_tokens
+    from client import BaseClient, BatchConfig, UsageInfo, count_tokens, truncate_to_tokens
 except:
-    from .client import BaseClient, BatchConfig, count_tokens, truncate_to_tokens
+    from .client import BaseClient, BatchConfig, UsageInfo, count_tokens, truncate_to_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -166,8 +166,8 @@ class RaterEmbedderClient(BaseClient):
 
         return cosine_similarity(self.query_embedding, doc_embedding)
 
-    def _make_sync_request(self, payload):
-        """Override to handle embedding response"""
+    def _make_sync_request(self, payload) -> tuple[str, Optional[UsageInfo]]:
+        """Override to handle embedding response with usage tracking"""
         payload.pop('stream',None)
 
         headers = self._get_headers()
@@ -176,14 +176,29 @@ class RaterEmbedderClient(BaseClient):
         response = requests.post(endpoint, headers=headers,json=payload)
         response.raise_for_status()
 
-        return json.dumps(response.json())
+        result = response.json()
+
+        # Extract usage information if available
+        usage_info = UsageInfo(provider=self.config.provider, model=self.config.model)
+        if "usage" in result:
+            usage_data = result["usage"]
+            usage_info.prompt_tokens = usage_data.get("prompt_tokens", 0)
+            usage_info.completion_tokens = usage_data.get("completion_tokens", 0)
+            usage_info.update_total()
+
+        return json.dumps(result), usage_info
     
-    def process_single(self, input_data, sleep_time = 0.0):
+    def process_single(self, input_data, sleep_time = 0.0, return_usage=False):
         """Process single input, raising exception on failure."""
-        result = super().process_single(input_data, sleep_time)
-        if result is None: # error from base client
-            return None
-        return result
+        result, usage_info = super().process_single(input_data, sleep_time, return_usage=True)
+        if return_usage:
+            if result is None: # error from base client
+                return None, usage_info
+            return result, usage_info
+        else:
+            if result is None: # error from base client
+                return None
+            return result
               
 class RaterLLMClient(BaseClient):
     def __init__(self, config: RaterLLMConfig, batch_config: Optional[BatchConfig]=None):
@@ -277,12 +292,15 @@ class RaterLLMClient(BaseClient):
         messages.append({"role": "user", "content": user_content})
         return messages
 
-    def process_single(self, input_data, sleep_time = 2.0):
+    def process_single(self, input_data, sleep_time = 2.0, return_usage=False):
         """Process single input, raising exception on failure."""
-        result = super().process_single(input_data, sleep_time)
-        if result is None: # error from base client
-            return None
-        return result
+        result, usage_info = super().process_single(input_data, sleep_time, return_usage=True)
+        if return_usage:
+            if result is None:  # Add missing null check
+                return None, usage_info
+            return result, usage_info
+        else:
+            return result
 
 def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Optional[BatchConfig]=None) -> List[RateResult]:
     """Rate papers using embedding similarity with text chunking."""
@@ -297,8 +315,11 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
             
             if token_count <= embedder_client.context_length:
                 # Text fits, get similarity directly
-                similarity_score = embedder_client.process_single(content)
-                logger.debug(f"Rated paper with embedder ({token_count} tokens)")
+                similarity_score, usage_info = embedder_client._process_single_with_usage(content)
+                if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):
+                    logger.debug(f"Rated paper with embedder {usage_info}")
+                else:
+                    logger.debug(f"Rated paper with embedder {embedder_client.config.model} (usage info unavailable)")
             else:
                 # Text too long, chunk and get weighted average
                 chunks = chunk_text(content, embedder_client.context_length)
@@ -306,7 +327,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
                 chunk_weights = [chunk[1] for chunk in chunks]
                 
                 # Get similarities for all chunks (could use batch processing here)
-                chunk_similarities = [embedder_client.process_single(chunk_text) for chunk_text in chunk_texts]
+                chunk_similarities = [embedder_client._process_single_with_usage(chunk_text)[0] for chunk_text in chunk_texts]
 
                 # Calculate weighted average, filtering out None values (failed API calls)
                 valid_pairs = [(sim, weight) for sim, weight in zip(chunk_similarities, chunk_weights) if sim is not None]
@@ -322,7 +343,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
                     weighted_similarity = None
                 
                 similarity_score = weighted_similarity
-                logger.debug(f"Rated paper with embedder ({len(chunks)} chunks)")
+                logger.debug(f"Rated paper with embedder {embedder_client.config.model} ({len(chunks)} chunks)")
             
             results.append(RateResult(
                 score=similarity_score if similarity_score is not None else 0.0,
@@ -351,7 +372,7 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
         final_results = []
         for content in parsed_contents:
             token_count = count_tokens(content)
-            result = client.process_single(content)
+            result, usage_info = client._process_single_with_usage(content)
             final_results.append(
                 RateResult(
                     score=result if result is not None else 0.0,
@@ -360,7 +381,10 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
                     method="llm_single"
                 )
             )
-            logger.debug(f"Rated paper with llm ({token_count} tokens)")
+            if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):
+                logger.debug(f"Rated paper with {usage_info}")
+            else:
+                logger.debug(f"Rated paper with {client.config.model} (usage info unavailable)")
         logger.info(f"LLM rating completed: {len([r for r in final_results if r.success])} successful")
         return final_results
 

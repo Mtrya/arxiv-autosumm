@@ -9,7 +9,7 @@ import tiktoken
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -20,6 +20,27 @@ class BatchConfig:
     max_wait_hours: int
     poll_interval_seconds: int
     fallback_on_error: bool
+
+@dataclass
+class UsageInfo:
+    """Standardized usage information across different providers"""
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    provider: str = ""
+    model: str = ""
+
+    def __str__(self) -> str:
+        if self.total_tokens > 0:
+            return f"{self.model} ({self.prompt_tokens} -> {self.completion_tokens})"
+        elif self.prompt_tokens > 0 or self.completion_tokens > 0:
+            # For cases where we only have partial info
+            return f"{self.model} ({self.prompt_tokens} -> {self.completion_tokens})"
+        return f"{self.model} (usage info unavailable)"
+
+    def update_total(self):
+        """Calculate total tokens from prompt and completion tokens"""
+        self.total_tokens = self.prompt_tokens + self.completion_tokens
 
 class BaseClient(ABC):
     def __init__(self, config, batch_config: Optional[BatchConfig]=None):
@@ -89,8 +110,13 @@ class BaseClient(ABC):
         """Check if the provider is Ollama."""
         return self.config.provider.lower() == "ollama"
 
-    def _make_sync_request(self, payload: dict) -> str:
-        """Make a synchronous API request."""
+    def _make_sync_request(self, payload: dict) -> tuple[str, Optional[UsageInfo]]:
+        """Make a synchronous API request, returning content and usage info."""
+        # Add stream_options for OpenAI when streaming is enabled
+        if payload.get("stream", False) and not self._is_anthropic_provider() and not self._is_ollama_provider():
+            if "stream_options" not in payload:
+                payload["stream_options"] = {"include_usage": True}
+
         # Convert payload format if needed
         if self._is_anthropic_provider():
             payload = self._convert_payload_for_anthropic(payload)
@@ -137,8 +163,10 @@ class BaseClient(ABC):
                 headers["Authorization"] = f"Bearer {self.config.api_key}"
         return headers
 
-    def _handle_ollama_response(self, response, is_streaming: bool) -> str:
+    def _handle_ollama_response(self, response, is_streaming: bool) -> tuple[str, Optional[UsageInfo]]:
         """Handle Ollama API response format."""
+        usage_info = UsageInfo(provider=self.config.provider, model=self.config.model)
+
         if is_streaming:
             full_response = ""
             for line in response.iter_lines():
@@ -147,17 +175,27 @@ class BaseClient(ABC):
                         chunk = json.loads(line.decode('utf-8'))
                         if chunk.get('message', {}).get('content'):
                             full_response += chunk['message']['content']
+                        # Extract usage from final streaming chunk
                         if chunk.get('done', False):
+                            usage_info.prompt_tokens = chunk.get('prompt_eval_count', 0)
+                            usage_info.completion_tokens = chunk.get('eval_count', 0)
+                            usage_info.update_total()
                             break
                     except json.JSONDecodeError:
                         continue
-            return full_response.strip()
+            return full_response.strip(), usage_info
         else:
             result = response.json()
-            return result['message']['content']
+            # Extract usage from non-streaming response
+            usage_info.prompt_tokens = result.get('prompt_eval_count', 0)
+            usage_info.completion_tokens = result.get('eval_count', 0)
+            usage_info.update_total()
+            return result['message']['content'], usage_info
         
-    def _handle_anthropic_response(self, response, is_streaming: bool) -> str:
+    def _handle_anthropic_response(self, response, is_streaming: bool) -> tuple[str, Optional[UsageInfo]]:
         """Handle Anthropic API response format."""
+        usage_info = UsageInfo(provider=self.config.provider, model=self.config.model)
+
         if is_streaming:
             full_response = ""
             for line in response.iter_lines():
@@ -169,17 +207,34 @@ class BaseClient(ABC):
                             if chunk.get('type') == 'content_block_delta':
                                 if chunk.get('delta', {}).get('text'):
                                     full_response += chunk['delta']['text']
+                            # Extract usage from streaming response
+                            elif chunk.get('type') == 'message_start':
+                                if chunk.get('message', {}).get('usage'):
+                                    usage_data = chunk['message']['usage']
+                                    usage_info.prompt_tokens = usage_data.get('input_tokens', 0)
+                            elif chunk.get('type') == 'message_delta':
+                                if chunk.get('usage', {}).get('output_tokens'):
+                                    usage_info.completion_tokens = chunk['usage']['output_tokens']
                             elif chunk.get('type') == 'message_stop':
                                 break
                         except json.JSONDecodeError:
                             continue
-            return full_response.strip()
+            usage_info.update_total()
+            return full_response.strip(), usage_info
         else:
             result = response.json()
-            return result['content'][0]['text']
+            # Extract usage from non-streaming response
+            if result.get('usage'):
+                usage_data = result['usage']
+                usage_info.prompt_tokens = usage_data.get('input_tokens', 0)
+                usage_info.completion_tokens = usage_data.get('output_tokens', 0)
+                usage_info.update_total()
+            return result['content'][0]['text'], usage_info
 
-    def _handle_openai_response(self, response, is_streaming: bool) -> str:
+    def _handle_openai_response(self, response, is_streaming: bool) -> tuple[str, Optional[UsageInfo]]:
         """Handle OpenAI-compatible API response format."""
+        usage_info = UsageInfo(provider=self.config.provider, model=self.config.model)
+
         if is_streaming:
             full_response = ""
             for line in response.iter_lines():
@@ -192,12 +247,24 @@ class BaseClient(ABC):
                             chunk = json.loads(line[6:])  # Remove 'data: ' prefix
                             if chunk.get('choices', [{}])[0].get('delta', {}).get('content'):
                                 full_response += chunk['choices'][0]['delta']['content']
+                            # Extract usage from streaming response
+                            if chunk.get('usage'):
+                                usage_data = chunk['usage']
+                                usage_info.prompt_tokens = usage_data.get('prompt_tokens', 0)
+                                usage_info.completion_tokens = usage_data.get('completion_tokens', 0)
+                                usage_info.total_tokens = usage_data.get('total_tokens', 0)
                         except json.JSONDecodeError:
                             continue
-            return full_response.strip()
+            return full_response.strip(), usage_info
         else:
             result = response.json()
-            return result['choices'][0]['message']['content']
+            # Extract usage from non-streaming response
+            if result.get('usage'):
+                usage_data = result['usage']
+                usage_info.prompt_tokens = usage_data.get('prompt_tokens', 0)
+                usage_info.completion_tokens = usage_data.get('completion_tokens', 0)
+                usage_info.total_tokens = usage_data.get('total_tokens', 0)
+            return result['choices'][0]['message']['content'], usage_info
         
     def _create_batch_jsonl(self, input_data_list: List[Any], jsonl_path: str):
         """Create JSONL file for batch processing"""
@@ -336,7 +403,7 @@ class BaseClient(ABC):
 
         for idx in failed_indices:
             try:
-                individual_result = self.process_single(input_data_list[idx])
+                individual_result = self.process_single(input_data_list[idx], return_usage=False)
                 final_results[idx] = individual_result
                 if individual_result is not None:
                     logger.info(f"Successfully recovered item {idx} via individual processing")
@@ -384,16 +451,28 @@ class BaseClient(ABC):
 
         return final_results
 
-    def process_single(self, input_data: Any, sleep_time: float=0) -> Optional[str]:
-        """Process single input synchronously"""
+    def process_single(self, input_data: Any, sleep_time: float=0, return_usage: bool=False) -> Union[Optional[str], tuple[Optional[str], Optional[UsageInfo]]]:
+        """Process single input synchronously, optionally returning usage info"""
         time.sleep(sleep_time)
         try:
             payload = self._build_payload(input_data)
-            response_content = self._make_sync_request(payload)
-            return self._parse_response(response_content)
+            response_content, usage_info = self._make_sync_request(payload)
+            parsed_result = self._parse_response(response_content)
+
+            if return_usage:
+                return parsed_result, usage_info
+            else:
+                return parsed_result
         except Exception as e:
             logger.error(f"Failed to process input: {e}")
-            return None
+            if return_usage:
+                return None, None
+            else:
+                return None
+
+    def _process_single_with_usage(self, input_data: Any, sleep_time: float=0) -> tuple[Optional[str], Optional[UsageInfo]]:
+        """Internal method that always returns usage info - for new code that expects it"""
+        return self.process_single(input_data, sleep_time, return_usage=True)
 
 def count_tokens(text: str) -> int:
     encoding = tiktoken.get_encoding("cl100k_base")

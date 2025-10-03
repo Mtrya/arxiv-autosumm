@@ -7,9 +7,9 @@ from typing import Optional, Dict, Any, List
 import logging
 
 try:
-    from client import BaseClient, BatchConfig, count_tokens, truncate_to_tokens
+    from client import BaseClient, BatchConfig, UsageInfo, count_tokens, truncate_to_tokens
 except:
-    from .client import BaseClient, BatchConfig, count_tokens, truncate_to_tokens
+    from .client import BaseClient, BatchConfig, UsageInfo, count_tokens, truncate_to_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,15 @@ def summarize(parsed_contents: List[str], config: SummarizerConfig, batch_config
     if not getattr(config, 'batch', False):
         # If batch is disabled, process sequentially
         client = SummarizerClient(config, batch_config)
-        results = [client.process_single(content, sleep_time=60) for content in parsed_contents]
+        results = []
+        for content in parsed_contents:
+            result, usage_info = client._process_single_with_usage(content, sleep_time=60)
+            results.append(result)
+            if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):
+                logger.debug(f"Summarized paper with {usage_info}")
+            else:
+                logger.debug(f"Summarized paper with {client.config.model} (usage info unavailable)")
+
         final_results = [
             SummaryResult(
                 content=result or "",

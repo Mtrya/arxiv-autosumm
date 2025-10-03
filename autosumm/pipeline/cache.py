@@ -188,7 +188,7 @@ class Cacher:
         conn.close()
         
         processed = result is not None
-        logger.debug(f"Paper {arxiv_id} processed status: {processed}")
+        logger.debug(f"Paper {arxiv_id} summarized: {processed}")
         return processed
     
     def mark_paper_processed(self, arxiv_id: str, metadata: Dict):

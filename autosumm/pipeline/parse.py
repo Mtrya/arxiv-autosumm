@@ -17,9 +17,9 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 try:
-    from client import BaseClient, BatchConfig
+    from client import BaseClient, BatchConfig, UsageInfo
 except:
-    from .client import BaseClient, BatchConfig
+    from .client import BaseClient, BatchConfig, UsageInfo
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +239,14 @@ def parse_vlm(pdf_urls: List[str], config: ParserConfig, batch_config: Optional[
     if config.vlm.batch:
         vlm_results = vlm_client.process_batch(all_image_data)
     else:
-        vlm_results = [vlm_client.process_single(image_data) for image_data in all_image_data]
+        vlm_results = []
+        for image_data in all_image_data:
+            result, usage_info = vlm_client._process_single_with_usage(image_data, sleep_time=2)
+            if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):
+                logger.debug(f"Converted image with {usage_info}")
+            else:
+                logger.debug(f"Converted image with {vlm_client.config.model} (usage info unavailable)")
+            vlm_results.append(result)
     
     results = _reconstruct_results(vlm_results, pdf_image_counts)
 
@@ -273,11 +280,6 @@ def _parse_fast_single(pdf_url: str, config: ParserConfig, pdf_index: int) -> Pa
 
         # Remove inappropriate line breaks within paragraphs to form coherent sentences.
         content = re.sub(r'(?<!\n)\n(?!\n)', ' ', content)
-        
-        # Remove content after "References" or "REFERENCES" to focus on the main body.
-        match = re.search(r'\n\s*(References|REFERENCES)\s*\n', content)
-        if match:
-            content = content[:match.start()]
 
         logger.debug(f"Successfully parsed PDF {pdf_index+1} ({pdf_url})")
         return ParseResult(
@@ -303,7 +305,6 @@ def _parse_fast_single(pdf_url: str, config: ParserConfig, pdf_index: int) -> Pa
             method="fast"
         )
             
-
 def parse_fast(pdf_urls: List[str], config: ParserConfig) -> List[ParseResult]:
     """
     Fast parsing using requests and pdfminer.
@@ -354,13 +355,13 @@ def parse_fast(pdf_urls: List[str], config: ParserConfig) -> List[ParseResult]:
 
 if __name__ == "__main__":
     vlm_config = ParserVLMConfig(
-        provider="siliconflow",
-        api_key=os.getenv("SILICONFLOW_API_KEY"),
-        base_url="https://api.siliconflow.cn/v1",
-        model="Pro/Qwen/Qwen2.5-VL-7B-Instruct",
+        provider="openrouter",
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+        base_url="https://openrouter.ai/api/v1",
+        model="amazon/nova-lite-v1",
         batch=False,
         system_prompt="""You are an AI specialized in recognizing and extracting text. 
-Your mission and your only mission is to analyze the image document and return it in **markdown** format, use markdown syntax to preserve the title level of the original document.""",
+Your **sole** mission is to analyze the image document and return it in **markdown** format, use markdown syntax to preserve the title level of the original document.""",
         user_prompt="""Extract the text from the above document image as if you were reading it naturally. Return the equations in LaTeX representation. If there is an image in the document and image caption is not present, add a brief description of the image. If there is a table in the document and table caption is not present, add a brief description of the table without reproducing it with html. Do not include page numbers for better readability.""",
         completion_options={"temperature":0.2}
     )
@@ -373,12 +374,14 @@ Your mission and your only mission is to analyze the image document and return i
     config = ParserConfig(
         enable_vlm=True,
         tmp_dir="./tmp",
+        fast_parser_timeout_seconds=300,
         vlm=vlm_config
     )
 
 
     pdf_url = "http://arxiv.org/pdf/1706.03762"
-    result = parse_vlm([pdf_url], config, batch_config)[0]
+    #result = parse_vlm([pdf_url], config, batch_config)[0]
+    result = parse_fast([pdf_url], config)[0]
 
     print(f"VLM parsing success: {result.success}")
     print(f"Content:\n{result.content}")
