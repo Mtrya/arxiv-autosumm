@@ -92,9 +92,6 @@ deliver:
   password: env:SMTP_PASSWORD
 EOF
 
-# Secrets are now handled via environment variables - no .env file needed
-echo "🔐 Using environment variables for secrets (no .env file created)"
-
 echo ""
 echo "✅ Configuration generated successfully"
 echo "📊 Configuration summary:"

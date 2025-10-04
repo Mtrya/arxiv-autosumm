@@ -34,12 +34,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
 
-    - name: Cache APT packages
-      uses: actions/cache@v4
-      with:
-        path: /var/cache/apt
-        key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/main.yml') }}
-
+  
     - name: Cache ArXiv Paper Database
       uses: actions/cache@v4
       with:
@@ -88,6 +83,7 @@ jobs:
         echo "SENDER_EMAIL=${{ secrets.SENDER_EMAIL }}" >> $GITHUB_ENV
         echo "RECIPIENT_EMAIL=${{ secrets.RECIPIENT_EMAIL }}" >> $GITHUB_ENV
         echo "SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}" >> $GITHUB_ENV
+        echo "✅ Group A secrets export completed"
 
         # Export Group B Secrets (provider API keys)
         echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> $GITHUB_ENV
@@ -106,9 +102,11 @@ jobs:
         echo "TOGETHER_API_KEY=${{ secrets.TOGETHER_API_KEY }}" >> $GITHUB_ENV
         echo "ARK_API_KEY=${{ secrets.ARK_API_KEY }}" >> $GITHUB_ENV
         echo "ZHIPU_API_KEY=${{ secrets.ZHIPU_API_KEY }}" >> $GITHUB_ENV
+        echo "✅ Group B secrets export completed"
 
         # Export Custom Secrets (manually added)
         echo "MINERU_TOKEN=${{ secrets.MINERU_TOKEN }}" >> $GITHUB_ENV
+        echo "✅ Custom secrets export completed"
 
         echo "✅ Repository variables and secrets export completed"
 
