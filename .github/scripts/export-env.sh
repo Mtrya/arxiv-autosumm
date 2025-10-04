@@ -29,23 +29,18 @@ else
   echo "🐛 Debug: Testing jq with JSON..."
   echo "$VARS_JSON" | jq . || echo "🐛 Debug: jq failed with our JSON"
 
-  # Export ALL repository variables as environment variables
-  echo "$VARS_JSON" | jq -r 'to_entries[] |
-    "export \(.key)=\(.value)"' > /tmp/vars_exports.sh
+  # GitHub Actions outputs vars in unquoted format, parse manually
+  echo "$VARS_JSON" | grep -E '^\s*[A-Za-z_][A-Za-z0-9_\-\.]*:' | while IFS= read -r line; do
+    # Extract key and value from format like:  KEY: value,
+    key=$(echo "$line" | sed 's/^\s*\([^:]*\):.*/\1/' | tr -d ' ')
+    # FIXED: Properly handle trailing commas
+    value=$(echo "$line" | sed 's/^[^:]*:\s*\(.*[^,]\)[,]\?$/\1/' | sed 's/^"//' | sed 's/"$//')
 
-  # Source the exports to make them available in current shell
-  source /tmp/vars_exports.sh
-
-  # Show what was exported (without revealing values)
-  echo "$VARS_JSON" | jq -r 'keys[]' | while read var_name; do
-    echo "  ✅ Exported: $var_name"
+    if [ -n "$key" ] && [ -n "$value" ]; then
+      echo "  ✅ Exporting: $key"
+      echo "$key=$value" >> $GITHUB_ENV
+    fi
   done
-
-  # Make the exports available to subsequent steps by adding to GITHUB_ENV
-  sed 's/^export //' /tmp/vars_exports.sh >> $GITHUB_ENV
-
-  # Clean up temporary file
-  rm -f /tmp/vars_exports.sh
 fi
 
 echo "✅ Repository variable export completed"
