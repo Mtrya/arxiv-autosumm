@@ -84,7 +84,7 @@ For full control over advanced settings like VLM parsing, embedder rating and cu
 
    - Copy `config.advanced.yaml` to `config.yaml`
    - **Put all settings directly in config.yaml**: categories, models, output formats, etc.
-   - **Only use environment variables for sensitive data**: `api_key: env:API_KEY`
+   - **Use environment variables for sensitive data**: `api_key: env:API_KEY`
    - Commit `config.yaml` to your repository
 
 3. **Customize Prompts (Optional)**
@@ -99,24 +99,23 @@ For full control over advanced settings like VLM parsing, embedder rating and cu
 
 4. **Configure Secrets and Variables**
 
-   Configure your repository with secrets and variables for maximum flexibility:
+   Configure your repository with secrets for safety concerns and variables for maximum flexibility:
 
    **Environment Variables** (for all configuration):
-   - Use for API keys, passwords, and any settings
-   - Reference in config.yaml with `env:` prefix: `api_key: env:API_KEY`
+     - Use for API keys, passwords, and any settings
+     - Reference in config.yaml with `env:` prefix: `api_key: env:API_KEY`
 
    Two types of environment variables are supported:
 
-   **Repository Secrets** (sensitive data):
-   - **Naming**: Use CAPITAL letters with underscores (e.g., `MY_API_KEY`, `COMPANY_EMAIL`)
-   - Use for API keys, passwords, and sensitive information
-   - Reference with `env:` prefix: `api_key: env:MY_API_KEY`
-   - GitHub Actions automatically masks secrets in logs regardless of name
+   Use **Repository Secrets** for sensitive data:
+     - Save API keys, passwords, and sensitive information to repository secrets
+     - Reference with `env:` prefix: `api_key: env:MY_API_KEY` in `config.yaml`
+     - GitHub Actions automatically masks secrets in logs
 
-   **Repository Variables** (flexible configuration):
-   - Support any variable name you choose
-   - Use for settings you want to change without committing code
-   - Also reference with `env:` prefix: `max_results: env:FETCH_RESULTS`
+   Use **Repository Variables** for flexible configuration:
+     - Support any variable name you choose
+     - Use for settings you want to change without committing `config.yaml`
+     - Also reference with `env:` prefix: `max_results: env:FETCH_RESULTS`
 
 **Example Usage:**
 
@@ -127,18 +126,78 @@ fetch:
 
 summarize:
   model: env:MY_SUMMARIZER_MODEL  # Repository variable (any name)
-  api_key: env:MY_API_KEY         # Repository secret (any name you want)
+  api_key: env:SUMMARIZER_API_KEY # Pre-defined secret name
 
 rate:
   max_selected: env:MAX_PAPERS    # Repository variable (any name)
 ```
 
-**Secret Naming:**
+**Secret Naming Constraints:**
 
-- **For secrets** (API keys, passwords): Use CAPITAL letters with underscores (e.g., `MY_OPENAI_KEY`, `COMPANY_API_KEY`)
-- **For variables** (settings, preferences): Use any name you want
-- Both are referenced with the same `env:` prefix in config.yaml
-- Valid secret examples: `OPENAI_API_KEY`, `MY_COMPANY_KEY`, `SECRET_EMAIL`, `API_KEY_V2`
+GitHub Actions has technical limitations that prevent truly unlimited custom secret names. Here's what's actually supported:
+
+**✅ What Works:**
+
+1. **Repository Variables**: Any name you want (these are not secrets)
+   - Example: `MY_MODEL`, `CUSTOM_DAYS`, `FETCH_RESULTS`
+
+2. **Pre-defined Secret Names** (Option A): Fixed names for quick setup
+
+   ```yaml
+   # These specific names work:
+   SUMMARIZER_API_KEY, RATER_API_KEY, SMTP_PASSWORD
+   SUMMARIZER_PROVIDER, SUMMARIZER_MODEL, MAX_PAPERS
+   # ... and more (see .github/scripts/export-env.sh lines 49-67)
+   ```
+
+3. **Provider API Keys** (Option B): Standard `{PROVIDER}_API_KEY` pattern
+
+   ```yaml
+   # These provider-specific names work:
+   ANTHROPIC_API_KEY, OPENAI_API_KEY, DEEPSEEK_API_KEY
+   MODELSCOPE_API_KEY, ZHIPU_API_KEY, SILICONFLOW_API_KEY
+   # ... and all recognized providers (lines 92-107)
+   ```
+
+**❌ Why Unlimited Custom Names Don't Work:**
+
+1. **Technical Limitation**: GitHub Actions cannot dynamically access secret names at runtime
+   - Secrets must be explicitly referenced in workflow files using `${{ secrets.SECRET_NAME }}`
+   - No programmatic way to list or access arbitrary secret names
+
+2. **Security Design**: GitHub intentionally restricts secret access
+   - Prevents accidental exposure of all repository secrets
+   - Requires explicit declaration of which secrets a workflow can access
+   - Auditing and security boundaries depend on this limitation
+
+**🔧 Adding Additional Secret Names:**
+
+If you need secret names beyond the supported patterns, you must manually add them to `.github/scripts/export-env.sh` after line 107:
+
+```bash
+# Add your custom secrets after line 107
+echo "MY_CUSTOM_API_KEY=\${{ secrets.MY_CUSTOM_API_KEY }}" >> $GITHUB_ENV
+echo "COMPANY_EMAIL=\${{ secrets.COMPANY_EMAIL }}" >> $GITHUB_ENV
+```
+
+**Example Configuration:**
+
+```yaml
+# Using pre-defined Option A secrets
+summarize:
+  api_key: env:SUMMARIZER_API_KEY     # Works out of the box
+  model: env:SUMMARIZER_MODEL        # Works out of the box
+
+# Using provider API keys
+summarize:
+  provider: openai
+  api_key: env:OPENAI_API_KEY        # Works out of the box
+
+# Using repository variables (not secrets)
+summarize:
+  model: env:MY_CHOSEN_MODEL         # Repository variable, any name
+  temperature: env:MY_TEMP_SETTING   # Repository variable, any name
+```
 
 ### Method 2: Local Setup with Git Clone
 
@@ -445,19 +504,24 @@ deliver:
 
 #### Default LLM Providers
 
-| Provider | Example Model | Notes |
+| Provider | Example Model | Requirements |
 |----------|---------------|--------|
-| **OpenAI** | gpt-5, gpt-4.1 | Requires OPENAI_API_KEY |
-| **DeepSeek** | deepseek-reasoner | Requires DEEPSEEK_API_KEY |
-| **DashScope** | qwen-max, qwen-turbo | Requires DASHSCOPE_API_KEY |
-| **SiliconFlow** | deepseek-ai/DeepSeek-R1 | Requires SILICONFLOW_API_KEY |
-| **Ollama** | qwen3:32b, llama3.1:8b | Requires Local Installation |
-| **Moonshot** | kimi-k2-0711-preview | Requires MOONSHOT_API_KEY |
-| **Minimax** | MiniMax-Text-01 | Requires MINIMAX_API_KEY |
-| **ModelScope** | Qwen/Qwen3-235B-A22B-Thinking-2507 | Requires MODELSCOPE_API_KEY |
-| **Zhipu** | glm-4.6, glm-4.5-flash | Requires ZHIPU_API_KEY |
-| **VolcEngine** | doubao-1.6-seed-thinking | Requires ARK_API_KEY |
-| **Anthropic** | claude-3.5-sonnet | Requires ANTHROPIC_API_KEY |
+| **Anthropic** | claude-sonnet-4-5-20250929 | ANTHROPIC_API_KEY |
+| **Cohere** | command-r-plus, command | COHERE_API_KEY |
+| **DashScope** | qwen-max, qwen-turbo | DASHSCOPE_API_KEY |
+| **DeepSeek** | deepseek-reasoner, deepseek-chat | DEEPSEEK_API_KEY |
+| **Gemini** | gemini-1.5-pro, gemini-1.5-flash | GEMINI_API_KEY |
+| **Groq** | llama-3.1-70b-versatile, mixtral-8x7b-32768 | GROQ_API_KEY |
+| **Minimax** | MiniMax-Text-01 | MINIMAX_API_KEY |
+| **ModelScope** | Qwen/Qwen2.5-7B-Instruct, Qwen/Qwen2.5-32B-Instruct | MODELSCOPE_API_KEY |
+| **Moonshot** | kimi-k2-0711-preview, moonshot-v1-8k | MOONSHOT_API_KEY |
+| **Ollama** | qwen2.5:7b, llama3.1:8b, deepseek-coder-v2:16b | Local Installation |
+| **OpenAI** | gpt-4o, gpt-4o-mini, text-embedding-3-small | OPENAI_API_KEY |
+| **OpenRouter** | anthropic/claude-3.5-sonnet, meta-llama/llama-3.1-70b-instruct | OPENROUTER_API_KEY |
+| **SiliconFlow** | deepseek-ai/DeepSeek-R1, Qwen/Qwen2.5-7B-Instruct | SILICONFLOW_API_KEY |
+| **Together** | meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo, Qwen/Qwen2.5-72B-Instruct-Turbo | TOGETHER_API_KEY |
+| **VolcEngine** | doubao-1.6-seed-thinking, doubao-pro-32k | ARK_API_KEY |
+| **Zhipu** | glm-4.6, glm-4.5-flash, glm-4v-plus | ZHIPU_API_KEY |
 
 ### Advanced Configuration
 

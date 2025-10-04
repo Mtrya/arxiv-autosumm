@@ -47,84 +47,52 @@ arxiv_categories = ["cs.AI","cs.AR","cs.CC","cs.CE","cs.CG","cs.CL","cs.CR","cs.
 
 recognized_providers = {
     "anthropic": {
-        "base_url": "https://api.anthropic.com",
-        "default_summarizer": "claude-opus-4-0",
-        "default_rater": "claude-3-5-haiku-latest"
+        "base_url": "https://api.anthropic.com"
     },
     "cohere": {
-        "base_url": "https://api.cohere.ai/v1",
-        "default_summarizer": "command-r-plus",
-        "default_rater": "command-r"
+        "base_url": "https://api.cohere.ai/v1"
     },
     "dashscope": {
-        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "default_summarizer": "qwen-plus",
-        "default_rater": "qwen-turbo"
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"
     },
     "deepseek": {
-        "base_url": "https://api.deepseek.com/v1",
-        "default_summarizer": "deepseek-reasoner",
-        "default_rater": "deepseek-chat"
+        "base_url": "https://api.deepseek.com/v1"
     },
     "gemini": {
-        "base_url": "https://generativelanguage.googleapis.com/v1beta",
-        "default_summarizer": "gemini-2.5-pro",
-        "default_rater": "gemini-2.5-flash"
+        "base_url": "https://generativelanguage.googleapis.com/v1beta"
     },
     "groq": {
-        "base_url": "https://api.groq.com/openai/v1",
-        "default_summarizer": "llama-3.1-70b-versatile",
-        "default_rater": "llama-3.1-8b-instant"
+        "base_url": "https://api.groq.com/openai/v1"
     },
     "minimax": {
-        "base_url": "https://api.minimax.chat/v1",
-        "default_summarizer": "MiniMax-M1",
-        "default_rater": "MiniMax-Text-01"
+        "base_url": "https://api.minimax.chat/v1"
     },
     "modelscope": {
-        "base_url": "https://api-inference.modelscope.cn/v1",
-        "default_summarizer": "Qwen/Qwen3-235B-A22B-Thinking-2507",
-        "default_rater": "Qwen/Qwen2.5-7B-Instruct"
+        "base_url": "https://api-inference.modelscope.cn/v1"
     },
     "moonshot": {
-        "base_url": "https://api.moonshot.cn/v1",
-        "default_summarizer": "kimi-k2-0711-preview",
-        "default_rater": "kimi-latest"
+        "base_url": "https://api.moonshot.cn/v1"
     },
     "ollama": {
-        "base_url": "https://localhost:11434",
-        "default_summarizer": "qwen3:32b",
-        "default_rater": "llama3.1:8b"
+        "base_url": "https://localhost:11434"
     },
     "openai": {
-        "base_url": "https://api.openai.com/v1",
-        "default_summarizer": "gpt-4o",
-        "default_rater": "gpt-4o-mini"
+        "base_url": "https://api.openai.com/v1"
     },
     "openrouter": {
-        "base_url": "https://openrouter.ai/api/v1",
-        "default_summarizer": "google/gemini-2.5-pro",
-        "default_rater": "google/gemini-2.5-flash-lite"
+        "base_url": "https://openrouter.ai/api/v1"
     },
     "siliconflow": {
-        "base_url": "https://api.siliconflow.cn/v1",
-        "default_summarizer": "deepseek-ai/DeepSeek-R1",
-        "default_rater": "THUDM/glm-4-9b-chat"
+        "base_url": "https://api.siliconflow.cn/v1"
     },
     "together": {
-        "base_url": "https://api.together.xyz/v1",
-        "default_summarizer": "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
-        "default_rater": "meta-llama/Meta-Llama-3.1-8B-Instruct"
+        "base_url": "https://api.together.xyz/v1"
     },
     "volcengine": {
-        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
-        "default_summarizer": "doubao-seed-1-6-thinking-250715",
-        "default_rater": "doubao-seed-1-6-flash-250715"
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3"
     },
     "zhipu": {
-        "base_url": "https://open.bigmodel.cn/api/paas/v4",
-        "default_summarizer": "glm-4.5",
-        "default_rater": "glm-4.5-flash"
+        "base_url": "https://open.bigmodel.cn/api/paas/v4"
     }
 }
 

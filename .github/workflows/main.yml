@@ -57,163 +57,16 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e .
 
-    - name: Check configuration strategy
-      id: config_check
+    - name: Export repository variables and secrets
       run: |
-        # Check both vars and env for USE_REPO_CONFIG
-        USE_REPO_CONFIG_VALUE="${{ vars.USE_REPO_CONFIG }}"
-        if [ "$USE_REPO_CONFIG_VALUE" = "" ]; then
-          USE_REPO_CONFIG_VALUE="${{ env.USE_REPO_CONFIG }}"
-        fi
-        if [ "$USE_REPO_CONFIG_VALUE" = "" ]; then
-          USE_REPO_CONFIG_VALUE="${{ secrets.USE_REPO_CONFIG }}"
-        fi
-
-        
-        if [ "$USE_REPO_CONFIG_VALUE" = "true" ] && [ -f "config.yaml" ]; then
-          echo "USING_REPO_CONFIG=true" >> $GITHUB_OUTPUT
-          echo "Using existing config.yaml from repository"
-        else
-          echo "USING_REPO_CONFIG=false" >> $GITHUB_OUTPUT
-          echo "Will generate config from environment variables"
-        fi
+        # Run the universal environment export script
+        .github/scripts/export-env.sh
 
     - name: Create config from environment (if needed)
-      if: steps.config_check.outputs.USING_REPO_CONFIG != 'true'
-      env:
-        # ArXiv configuration
-        ARXIV_CATEGORIES: ${{ secrets.ARXIV_CATEGORIES }}
-        MAX_PAPERS: ${{ secrets.MAX_PAPERS }}
-        OUTPUT_FORMATS: ${{ secrets.OUTPUT_FORMATS }}
-        RATING_STRATEGY: ${{ secrets.RATING_STRATEGY }}
-
-        # Summarizer LLM configuration
-        SUMMARIZER_PROVIDER: ${{ secrets.SUMMARIZER_PROVIDER }}
-        SUMMARIZER_API_KEY: ${{ secrets.SUMMARIZER_API_KEY }}
-        SUMMARIZER_BASE_URL: ${{ secrets.SUMMARIZER_BASE_URL }}
-        SUMMARIZER_MODEL: ${{ secrets.SUMMARIZER_MODEL }}
-
-        # Rater LLM configuration
-        RATER_PROVIDER: ${{ secrets.RATER_PROVIDER }}
-        RATER_API_KEY: ${{ secrets.RATER_API_KEY }}
-        RATER_BASE_URL: ${{ secrets.RATER_BASE_URL }}
-        RATER_MODEL: ${{ secrets.RATER_MODEL }}
-
-        # Email configuration
-        SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
-        SMTP_PORT: ${{ secrets.SMTP_PORT }}
-        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-        RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
-        SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-
-        # Repository variables
-        TEST_MODE: ${{ github.event.inputs.test_mode || false }}
+      if: env.USE_REPO_CONFIG != 'true' || hashFiles('config.yaml') == ''
       run: |
-        # Set default values
-        CATEGORIES=${ARXIV_CATEGORIES:-'cs.AI,cs.CV,cs.RO'}
-        MAX_PAPERS_CONFIG=${MAX_PAPERS:-'5'}
-        OUTPUT_FORMATS_CONFIG=${OUTPUT_FORMATS:-'pdf,md'}
-        RATING_STRATEGY_CONFIG=${RATING_STRATEGY:-'llm'}
-
-        # Handle test mode with proper bash syntax
-        if [ "${{ github.event.inputs.test_mode || false }}" = "true" ]; then
-          TEST_DAYS="30"
-          TEST_MAX_RESULTS="10"
-        else
-          TEST_DAYS="3"
-          TEST_MAX_RESULTS="100"
-        fi
-
-        # Determine provider defaults
-        if [ -z "$SUMMARIZER_PROVIDER" ]; then
-          SUMMARIZER_PROVIDER="modelscope"
-        fi
-
-        if [ -z "$RATER_PROVIDER" ]; then
-          RATER_PROVIDER="$SUMMARIZER_PROVIDER"
-        fi
-
-        # Create config.yaml from environment variables
-        cat > config.yaml << EOF
-        run:
-          categories: [$(echo $CATEGORIES | sed 's/,/, /g')]
-          send_log: true
-          log_dir: ./logs
-
-        fetch:
-          days: $TEST_DAYS
-          max_results: $TEST_MAX_RESULTS
-          max_retries: 10
-
-        summarize:
-          provider: $SUMMARIZER_PROVIDER
-          api_key: env:SUMMARIZER_API_KEY
-          base_url: ${SUMMARIZER_BASE_URL:-'https://api-inference.modelscope.cn/v1/'}
-          model: ${SUMMARIZER_MODEL:-'Qwen/Qwen2.5-7B-Instruct'}
-          batch: false
-          system_prompt: file:./prompts/summ_lm/system.md
-          user_prompt_template: file:./prompts/summ_lm/user.md
-          completion_options:
-            temperature: 0.7
-          context_length: 245760
-
-        rate:
-          strategy: $RATING_STRATEGY_CONFIG
-          top_k: 80
-          max_selected: $MAX_PAPERS_CONFIG
-          embedder: null
-          llm:
-            provider: $RATER_PROVIDER
-            api_key: env:RATER_API_KEY
-            base_url: ${RATER_BASE_URL:-'https://api-inference.modelscope.cn/v1/'}
-            model: ${RATER_MODEL:-'Qwen/Qwen2.5-7B-Instruct'}
-            batch: false
-            system_prompt: file:./prompts/rate_lm/system.md
-            user_prompt_template: file:./prompts/rate_lm/user.md
-            completion_options:
-              temperature: 0.2
-              max_tokens: 1024
-            context_length: 122880
-            criteria:
-              novelty:
-                description: How original and innovative are the contributions?
-                weight: 0.3
-              methodology:
-                description: How rigorous is the experimental design and evaluation?
-                weight: 0.25
-              clarity:
-                description: How well-written and understandable is the paper?
-                weight: 0.2
-
-        render:
-          formats: [$(echo $OUTPUT_FORMATS_CONFIG | sed 's/,/, /g')]
-          output_dir: ./output
-          base_filename: null
-
-        cache:
-          dir: ~/.cache/arxiv-autosumm/
-          ttl_days: 16
-
-        deliver:
-          smtp_server: $SMTP_SERVER
-          port: ${SMTP_PORT:-'465'}
-          sender: $SENDER_EMAIL
-          recipient: $RECIPIENT_EMAIL
-          password: env:SMTP_PASSWORD
-        EOF
-
-        # Create .env file for API keys
-        cat > .env << EOF
-        SUMMARIZER_API_KEY=$SUMMARIZER_API_KEY
-        RATER_API_KEY=$RATER_API_KEY
-        SMTP_PASSWORD=$SMTP_PASSWORD
-        EOF
-
-        echo "Configuration generated successfully"
-        echo "Categories: $CATEGORIES"
-        echo "Max papers: $MAX_PAPERS_CONFIG"
-        echo "Output formats: $OUTPUT_FORMATS_CONFIG"
-        echo "Rating strategy: $RATING_STRATEGY_CONFIG"
+        # Run the config generation script
+        .github/scripts/create-config.sh
 
     - name: Ensure cache directory exists
       run: |
@@ -235,127 +88,11 @@ jobs:
         echo "OUTPUT_DIR=$OUTPUT_DIR" >> $GITHUB_ENV
         echo "Extracted output directory: $OUTPUT_DIR"
 
-    - name: Export all repository variables as environment variables
-      run: |
-        # Universal repository variable exporter - works with ANY variable name
-        # This allows users to set any repository variable and use it in their config.yaml
-        echo "🔧 Exporting ALL repository variables as environment variables..."
-
-        # Check if we have any repository variables
-        if [ -z "${{ toJSON(vars) }}" ] || [ "${{ toJSON(vars) }}" = "{}" ]; then
-          echo "ℹ️ No repository variables found"
-        else
-          echo "📋 Found repository variables, exporting as environment variables..."
-
-          # Install jq if not present (it's usually available in GitHub runners)
-          if ! command -v jq &> /dev/null; then
-            echo "📦 Installing jq for JSON processing..."
-            sudo apt-get update && sudo apt-get install -y jq
-          fi
-
-          # Export ALL repository variables as environment variables
-          echo '${{ toJSON(vars) }}' | jq -r 'to_entries[] |
-            "export \(.key)=\(.value)"' > /tmp/vars_exports.sh
-
-          # Source the exports to make them available in current shell
-          source /tmp/vars_exports.sh
-
-          # Show what was exported (without revealing values)
-          echo '${{ toJSON(vars) }}' | jq -r 'keys[]' | while read var_name; do
-            echo "  ✅ Exported: $var_name"
-          done
-
-          # Make the exports available to subsequent steps by adding to GITHUB_ENV
-          sed 's/^export //' /tmp/vars_exports.sh >> $GITHUB_ENV
-        fi
-
     - name: Validate configuration
-      env:
-        # Common API provider secrets (all providers from recognized_providers in config.py)
-        ANTHROCIC_API_KEY: ${{ secrets.ANTHROCIC_API_KEY }}
-        COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
-        DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
-        DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
-        MODELSCOPE_API_KEY: ${{ secrets.MODELSCOPE_API_KEY }}
-        MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
-        TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
-        VOLCENGINE_API_KEY: ${{ secrets.VOLCENGINE_API_KEY }}
-        ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
-
-        # Email configuration secrets
-        SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-        RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
-        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-        SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
-        SMTP_PORT: ${{ secrets.SMTP_PORT }}
-
-        # Common secret name variations
-        API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        EMBEDDER_API_KEY: ${{ secrets.EMBEDDER_API_KEY }}
-        VLM_API_KEY: ${{secrets.VLM_API_KEY }}
-        LLM_API_KEY: ${{secrets.LLM_API_KEY }}
-
-        # Secrets from default config generation
-        SUMMARIZER_API_KEY: ${{ secrets.SUMMARIZER_API_KEY }}
-        RATER_API_KEY: ${{ secrets.RATER_API_KEY }}
-        ARXIV_CATEGORIES: ${{ secrets.ARXIV_CATEGORIES }}
-        SUMMARIZER_PROVIDER: ${{ secrets.SUMMARIZER_PROVIDER }}
-        SUMMARIZER_BASE_URL: ${{ secrets.SUMMARIZER_BASE_URL }}
-        SUMMARIZER_MODEL: ${{ secrets.SUMMARIZER_MODEL }}
-        RATER_PROVIDER: ${{ secrets.RATER_PROVIDER }}
-        RATER_BASE_URL: ${{ secrets.RATER_BASE_URL }}
-        RATER_MODEL: ${{ secrets.RATER_MODEL }}
       run: |
         python -m autosumm.cli run --config config.yaml --test
 
     - name: Run ArXiv AutoSumm
-      env:
-        # Common API provider secrets (all providers from recognized_providers in config.py)
-        ANTHROCIC_API_KEY: ${{ secrets.ANTHROCIC_API_KEY }}
-        COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
-        DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
-        DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
-        MODELSCOPE_API_KEY: ${{ secrets.MODELSCOPE_API_KEY }}
-        MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
-        TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
-        VOLCENGINE_API_KEY: ${{ secrets.VOLCENGINE_API_KEY }}
-        ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
-
-        # Email configuration secrets
-        SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-        RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
-        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-        SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
-        SMTP_PORT: ${{ secrets.SMTP_PORT }}
-
-        # Common secret name variations
-        API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        EMBEDDER_API_KEY: ${{ secrets.EMBEDDER_API_KEY }}
-        VLM_API_KEY: ${{secrets.VLM_API_KEY }}
-        LLM_API_KEY: ${{secrets.LLM_API_KEY }}
-
-        # Secrets from default config generation
-        SUMMARIZER_API_KEY: ${{ secrets.SUMMARIZER_API_KEY }}
-        RATER_API_KEY: ${{ secrets.RATER_API_KEY }}
-        ARXIV_CATEGORIES: ${{ secrets.ARXIV_CATEGORIES }}
-        SUMMARIZER_PROVIDER: ${{ secrets.SUMMARIZER_PROVIDER }}
-        SUMMARIZER_BASE_URL: ${{ secrets.SUMMARIZER_BASE_URL }}
-        SUMMARIZER_MODEL: ${{ secrets.SUMMARIZER_MODEL }}
-        RATER_PROVIDER: ${{ secrets.RATER_PROVIDER }}
-        RATER_BASE_URL: ${{ secrets.RATER_BASE_URL }}
-        RATER_MODEL: ${{ secrets.RATER_MODEL }}
       run: |
         if [ "${{ github.event.inputs.category }}" != "" ]; then
           echo "Running with specified category: ${{ github.event.inputs.category }}"
@@ -373,8 +110,8 @@ jobs:
         path: |
           ${{ env.OUTPUT_DIR }}/**/*
           logs/
-          config.yaml
         retention-days: 30
+        if-no-files-found: warn
 
     - name: Get current date for release
       if: success() && github.event_name == 'schedule'
@@ -398,6 +135,7 @@ jobs:
           ${{ env.OUTPUT_DIR }}/**/*
         draft: false
         prerelease: false
+        generate_release_notes: false
         
     - name: Clean up old releases
       if: github.event_name == 'schedule'
