@@ -11,8 +11,13 @@ echo "📋 Exporting repository variables..."
 # Check if we have any repository variables
 VARS_JSON='${{ toJSON(vars) }}'
 
-if [ -z "$VARS_JSON" ] || [ "$VARS_JSON" = "{}" ]; then
+# Debug: Show what we got
+echo "🐛 Debug: VARS_JSON content: '$VARS_JSON'"
+echo "🐛 Debug: VARS_JSON length: ${#VARS_JSON}"
+
+if [ -z "$VARS_JSON" ] || [ "$VARS_JSON" = "{}" ] || [ "$VARS_JSON" = "null" ]; then
   echo "ℹ️ No repository variables found"
+  echo "🐛 Debug: VARS_JSON was empty, null, or {}"
 else
   echo "📋 Found repository variables, exporting as environment variables..."
 
@@ -21,6 +26,10 @@ else
     echo "📦 Installing jq for JSON processing..."
     sudo apt-get update && sudo apt-get install -y jq
   fi
+
+  # Debug: Test jq with our JSON
+  echo "🐛 Debug: Testing jq with JSON..."
+  echo "$VARS_JSON" | jq . || echo "🐛 Debug: jq failed with our JSON"
 
   # Export ALL repository variables as environment variables
   echo "$VARS_JSON" | jq -r 'to_entries[] |
@@ -40,6 +49,8 @@ else
   # Clean up temporary file
   rm -f /tmp/vars_exports.sh
 fi
+
+
 
 # Export supported secrets
 echo "🔐 Processing supported secrets..."

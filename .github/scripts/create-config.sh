@@ -11,17 +11,6 @@ MAX_PAPERS_CONFIG=${MAX_PAPERS:-'5'}
 OUTPUT_FORMATS_CONFIG=${OUTPUT_FORMATS:-'pdf,md'}
 RATING_STRATEGY_CONFIG=${RATING_STRATEGY:-'llm'}
 
-# Handle test mode with proper bash syntax
-if [ "${{ github.event.inputs.test_mode || false }}" = "true" ]; then
-  TEST_DAYS="30"
-  TEST_MAX_RESULTS="10"
-  echo "🧪 Test mode enabled: Using 30 days, max 10 results"
-else
-  TEST_DAYS="3"
-  TEST_MAX_RESULTS="100"
-  echo "📅 Normal mode: Using 3 days, max 100 results"
-fi
-
 # Determine provider defaults
 if [ -z "$SUMMARIZER_PROVIDER" ]; then
   SUMMARIZER_PROVIDER="modelscope"
@@ -42,8 +31,8 @@ run:
   log_dir: ./logs
 
 fetch:
-  days: $TEST_DAYS
-  max_results: $TEST_MAX_RESULTS
+  days: 3
+  max_results: 100
   max_retries: 10
 
 summarize:
@@ -56,7 +45,7 @@ summarize:
   user_prompt_template: file:./prompts/summ_lm/user.md
   completion_options:
     temperature: 0.7
-  context_length: 245760
+  context_length: 200000
 
 rate:
   strategy: $RATING_STRATEGY_CONFIG
@@ -74,7 +63,7 @@ rate:
     completion_options:
       temperature: 0.2
       max_tokens: 1024
-    context_length: 122880
+    context_length: 100000
     criteria:
       novelty:
         description: How original and innovative are the contributions?
