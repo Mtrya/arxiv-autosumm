@@ -34,12 +34,20 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
 
+    - name: Cache APT packages
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt
+        key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/main.yml') }}
+
     - name: Cache ArXiv Paper Database
       uses: actions/cache@v4
       with:
         path: ~/.cache/arxiv-autosumm/
-        key: arxiv-cache-v3
-        restore-keys: arxiv-cache-v2-
+        key: arxiv-cache-v4-${{ github.run_id }}-${{ hashFiles('config.yaml') || 'no-config' }}
+        restore-keys: |
+          arxiv-cache-v4-${{ github.run_id }}-
+          arxiv-cache-v4-
 
     - name: Install system dependencies
       run: |

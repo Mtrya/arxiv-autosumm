@@ -172,10 +172,10 @@ GitHub Actions has technical limitations that prevent truly unlimited custom sec
 
 **🔧 Adding Additional Secret Names:**
 
-If you need secret names beyond the supported patterns, you must manually add them to `.github/scripts/export-env.sh` after line 107:
+If you need secret names beyond the supported patterns, you must manually add them to `.github/workflows/main.yml` after line 103:
 
 ```bash
-# Add your custom secrets after line 107
+# Add your custom secrets after line 103
 echo "MY_CUSTOM_API_KEY=\${{ secrets.MY_CUSTOM_API_KEY }}" >> $GITHUB_ENV
 echo "COMPANY_EMAIL=\${{ secrets.COMPANY_EMAIL }}" >> $GITHUB_ENV
 ```
