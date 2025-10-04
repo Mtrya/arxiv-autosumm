@@ -41,6 +41,15 @@ autosumm = "autosumm.cli:app"
 [tool.setuptools]
 packages = ["autosumm"]
 
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple/"
+default = true
+
+[dependency-groups]
+dev = [
+    "pyyaml>=6.0.2",
+]
+
 [project.urls]
 Homepage = "https://github.com/Mtrya/arxiv-autosumm"
 Issues = "https://github.com/Mtrya/arxiv-autosumm/issues"

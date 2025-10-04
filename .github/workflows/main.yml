@@ -235,113 +235,127 @@ jobs:
         echo "OUTPUT_DIR=$OUTPUT_DIR" >> $GITHUB_ENV
         echo "Extracted output directory: $OUTPUT_DIR"
 
-    - name: Export ALL repository variables and secrets as environment variables
+    - name: Export all repository variables as environment variables
       run: |
-        # Universal exporter - works with ANY variable or secret name
-        # This allows users to set any repository variable/secret and use it in their config.yaml
-        # GitHub Actions will automatically mask secrets in logs regardless of their names
-        echo "🔧 Exporting ALL repository variables and secrets as environment variables..."
+        # Universal repository variable exporter - works with ANY variable name
+        # This allows users to set any repository variable and use it in their config.yaml
+        echo "🔧 Exporting ALL repository variables as environment variables..."
 
-        # Enable strict bash mode for better error handling
-        set -euo pipefail
-
-        # Install jq if not present (it's usually available in GitHub runners)
-        if ! command -v jq &> /dev/null; then
-          echo "📦 Installing jq for JSON processing..."
-          sudo apt-get update && sudo apt-get install -y jq
-        fi
-
-        # Secret name validation function - only allows capital letters and underscores
-        validate_secret_name() {
-          local name="${1:-}"
-          if [[ -z "${name}" ]] || [[ ! "${name}" =~ ^[A-Z][A-Z_]*$ ]]; then
-            echo "  ⚠️ Skipping invalid secret name format: ${name} (must be capital letters and underscores only)"
-            return 1
-          fi
-          return 0
-        }
-
-        # Export ALL repository variables as environment variables
-        if [ -n "${{ toJSON(vars) }}" ] && [ "${{ toJSON(vars) }}" != "{}" ]; then
+        # Check if we have any repository variables
+        if [ -z "${{ toJSON(vars) }}" ] || [ "${{ toJSON(vars) }}" = "{}" ]; then
+          echo "ℹ️ No repository variables found"
+        else
           echo "📋 Found repository variables, exporting as environment variables..."
+
+          # Install jq if not present (it's usually available in GitHub runners)
+          if ! command -v jq &> /dev/null; then
+            echo "📦 Installing jq for JSON processing..."
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
+          # Export ALL repository variables as environment variables
           echo '${{ toJSON(vars) }}' | jq -r 'to_entries[] |
             "export \(.key)=\(.value)"' > /tmp/vars_exports.sh
 
+          # Source the exports to make them available in current shell
+          source /tmp/vars_exports.sh
+
           # Show what was exported (without revealing values)
           echo '${{ toJSON(vars) }}' | jq -r 'keys[]' | while read var_name; do
-            echo "  ✅ Exported variable: $var_name"
+            echo "  ✅ Exported: $var_name"
           done
-        else
-          echo "ℹ️ No repository variables found"
-          touch /tmp/vars_exports.sh
+
+          # Make the exports available to subsequent steps by adding to GITHUB_ENV
+          sed 's/^export //' /tmp/vars_exports.sh >> $GITHUB_ENV
         fi
-
-        # Export ALL secrets as environment variables using GitHub CLI
-        # This allows us to dynamically discover and export ALL repository secrets
-        echo "🔒 Exporting ALL repository secrets as environment variables using GitHub CLI..."
-
-        # Create secrets export script
-        echo "# Repository secrets export script" > /tmp/secrets_exports.sh
-
-        # Use GitHub CLI to list all repository secrets and export them dynamically
-        # Note: This requires the GITHUB_TOKEN which is automatically available
-        if gh secret list --repo ${{ github.repository }} > /tmp/secret_list.txt 2>/dev/null; then
-          echo "📋 Discovered secrets, validating and exporting all of them..."
-
-          # Read each secret name and export it
-          while IFS= read -r secret_name; do
-            # Skip empty lines and headers
-            if [ -n "$secret_name" ] && [[ "$secret_name" != *"NAME"* ]]; then
-              # Extract just the secret name (handle tab/space separated output)
-              clean_name=$(echo "$secret_name" | awk '{print $1}')
-              if [ -n "$clean_name" ]; then
-                # Validate secret name format before exporting
-                if validate_secret_name "$clean_name"; then
-                  # Export the secret using GitHub CLI (avoids invalid dynamic secret references)
-                  secret_value=$(gh secret get "$clean_name" --repo ${{ github.repository }} 2>/dev/null || echo "")
-                  if [ -n "$secret_value" ]; then
-                    echo "export $clean_name='$secret_value'" >> /tmp/secrets_exports.sh
-                    echo "  🔒 Exported secret: $clean_name"
-                  else
-                    echo "  ⚠️ Failed to retrieve secret: $clean_name"
-                  fi
-                fi
-              fi
-            fi
-          done < /tmp/secret_list.txt
-        else
-          echo "⚠️ Could not list secrets via GitHub CLI (this is normal for forks or certain permissions)"
-          echo "🔄 Falling back to common secret names..."
-
-          # Fallback to common secret names if GitHub CLI approach fails
-          for secret in ANTHROCIC_API_KEY COHERE_API_KEY DASHSCOPE_API_KEY DEEPSEEK_API_KEY GEMINI_API_KEY GROQ_API_KEY MINIMAX_API_KEY MODELSCOPE_API_KEY MOONSHOT_API_KEY OPENAI_API_KEY OPENROUTER_API_KEY SILICONFLOW_API_KEY TOGETHER_API_KEY VOLCENGINE_API_KEY ZHIPU_API_KEY SMTP_PASSWORD RECIPIENT_EMAIL SENDER_EMAIL SMTP_SERVER SMTP_PORT API_KEY EMBEDDER_API_KEY VLM_API_KEY LLM_API_KEY SUMMARIZER_API_KEY RATER_API_KEY ARXIV_CATEGORIES SUMMARIZER_PROVIDER SUMMARIZER_BASE_URL SUMMARIZER_MODEL RATER_PROVIDER RATER_BASE_URL RATER_MODEL; do
-            if [ -n "${{ secrets[secret] }}" ]; then
-              if validate_secret_name "$secret"; then
-                # Export the secret using GitHub Actions syntax (single quotes prevent command injection)
-                echo "export $secret='${{ secrets[secret] }}'" >> /tmp/secrets_exports.sh
-                echo "  🔒 Exported secret: $secret"
-              fi
-            fi
-          done
-        fi
-
-        # Combine exports
-        cat /tmp/secrets_exports.sh >> /tmp/vars_exports.sh
-
-        # Source the exports to make them available in current shell
-        source /tmp/vars_exports.sh
-
-        # Make the exports available to subsequent steps by adding to GITHUB_ENV
-        sed 's/^export //' /tmp/vars_exports.sh >> $GITHUB_ENV
-
-        echo "✅ Export completed - All repository variables and valid secrets are now available as environment variables"
-        echo "ℹ️ Users can now use ANY secret name (capital letters + underscores) in their config.yaml - GitHub will mask them automatically in logs"
 
     - name: Validate configuration
+      env:
+        # Common API provider secrets (all providers from recognized_providers in config.py)
+        ANTHROCIC_API_KEY: ${{ secrets.ANTHROCIC_API_KEY }}
+        COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+        DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+        DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+        MODELSCOPE_API_KEY: ${{ secrets.MODELSCOPE_API_KEY }}
+        MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
+        TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
+        VOLCENGINE_API_KEY: ${{ secrets.VOLCENGINE_API_KEY }}
+        ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+
+        # Email configuration secrets
+        SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+        SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+        SMTP_PORT: ${{ secrets.SMTP_PORT }}
+
+        # Common secret name variations
+        API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        EMBEDDER_API_KEY: ${{ secrets.EMBEDDER_API_KEY }}
+        VLM_API_KEY: ${{secrets.VLM_API_KEY }}
+        LLM_API_KEY: ${{secrets.LLM_API_KEY }}
+
+        # Secrets from default config generation
+        SUMMARIZER_API_KEY: ${{ secrets.SUMMARIZER_API_KEY }}
+        RATER_API_KEY: ${{ secrets.RATER_API_KEY }}
+        ARXIV_CATEGORIES: ${{ secrets.ARXIV_CATEGORIES }}
+        SUMMARIZER_PROVIDER: ${{ secrets.SUMMARIZER_PROVIDER }}
+        SUMMARIZER_BASE_URL: ${{ secrets.SUMMARIZER_BASE_URL }}
+        SUMMARIZER_MODEL: ${{ secrets.SUMMARIZER_MODEL }}
+        RATER_PROVIDER: ${{ secrets.RATER_PROVIDER }}
+        RATER_BASE_URL: ${{ secrets.RATER_BASE_URL }}
+        RATER_MODEL: ${{ secrets.RATER_MODEL }}
       run: |
         python -m autosumm.cli run --config config.yaml --test
 
     - name: Run ArXiv AutoSumm
+      env:
+        # Common API provider secrets (all providers from recognized_providers in config.py)
+        ANTHROCIC_API_KEY: ${{ secrets.ANTHROCIC_API_KEY }}
+        COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+        DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+        DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+        MODELSCOPE_API_KEY: ${{ secrets.MODELSCOPE_API_KEY }}
+        MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
+        TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
+        VOLCENGINE_API_KEY: ${{ secrets.VOLCENGINE_API_KEY }}
+        ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+
+        # Email configuration secrets
+        SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+        SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+        SMTP_PORT: ${{ secrets.SMTP_PORT }}
+
+        # Common secret name variations
+        API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        EMBEDDER_API_KEY: ${{ secrets.EMBEDDER_API_KEY }}
+        VLM_API_KEY: ${{secrets.VLM_API_KEY }}
+        LLM_API_KEY: ${{secrets.LLM_API_KEY }}
+
+        # Secrets from default config generation
+        SUMMARIZER_API_KEY: ${{ secrets.SUMMARIZER_API_KEY }}
+        RATER_API_KEY: ${{ secrets.RATER_API_KEY }}
+        ARXIV_CATEGORIES: ${{ secrets.ARXIV_CATEGORIES }}
+        SUMMARIZER_PROVIDER: ${{ secrets.SUMMARIZER_PROVIDER }}
+        SUMMARIZER_BASE_URL: ${{ secrets.SUMMARIZER_BASE_URL }}
+        SUMMARIZER_MODEL: ${{ secrets.SUMMARIZER_MODEL }}
+        RATER_PROVIDER: ${{ secrets.RATER_PROVIDER }}
+        RATER_BASE_URL: ${{ secrets.RATER_BASE_URL }}
+        RATER_MODEL: ${{ secrets.RATER_MODEL }}
       run: |
         if [ "${{ github.event.inputs.category }}" != "" ]; then
           echo "Running with specified category: ${{ github.event.inputs.category }}"
