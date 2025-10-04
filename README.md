@@ -108,9 +108,10 @@ For full control over advanced settings like VLM parsing, embedder rating and cu
    Two types of environment variables are supported:
 
    **Repository Secrets** (sensitive data):
-   - Limited to predefined secret names in GitHub Actions workflow
+   - **Naming**: Use CAPITAL letters with underscores (e.g., `MY_API_KEY`, `COMPANY_EMAIL`)
    - Use for API keys, passwords, and sensitive information
-   - Reference with `env:` prefix: `api_key: env:OPENAI_API_KEY`
+   - Reference with `env:` prefix: `api_key: env:MY_API_KEY`
+   - GitHub Actions automatically masks secrets in logs regardless of name
 
    **Repository Variables** (flexible configuration):
    - Support any variable name you choose
@@ -126,32 +127,18 @@ fetch:
 
 summarize:
   model: env:MY_SUMMARIZER_MODEL  # Repository variable (any name)
-  api_key: env:OPENAI_API_KEY     # Repository secret (predefined name)
+  api_key: env:MY_API_KEY         # Repository secret (any name you want)
 
 rate:
   max_selected: env:MAX_PAPERS    # Repository variable (any name)
 ```
 
-**Allowed Secret Names** (predefined in GitHub Actions workflow):
+**Secret Naming:**
 
-```secrets
-# LLM Provider Keys
-OPENAI_API_KEY, DEEPSEEK_API_KEY, MODELSCOPE_API_KEY, DASHSCOPE_API_KEY
-SILICONFLOW_API_KEY, ZHIPU_API_KEY, MOONSHOT_API_KEY, MINIMAX_API_KEY
-ANTHROPIC_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, VOLCENGINE_API_KEY
-
-# Custom Function Keys
-SUMMARIZER_API_KEY, RATER_API_KEY, EMBEDDER_API_KEY, VLM_API_KEY, LLM_API_KEY, API_KEY
-
-# Email Configuration
-SMTP_PASSWORD, SENDER_EMAIL, RECIPIENT_EMAIL, SMTP_SERVER, SMTP_PORT
-```
-
-**Important Note:**
-
-- For **secrets** (API keys, passwords): Use only the predefined names above
-- For **variables** (settings, preferences): Use any name you want
+- **For secrets** (API keys, passwords): Use CAPITAL letters with underscores (e.g., `MY_OPENAI_KEY`, `COMPANY_API_KEY`)
+- **For variables** (settings, preferences): Use any name you want
 - Both are referenced with the same `env:` prefix in config.yaml
+- Valid secret examples: `OPENAI_API_KEY`, `MY_COMPANY_KEY`, `SECRET_EMAIL`, `API_KEY_V2`
 
 ### Method 2: Local Setup with Git Clone
 

@@ -192,9 +192,9 @@ def deliver(file_paths: List[str], config: DelivererConfig, subject: Optional[st
             server.sendmail(config.sender, config.recipient, msg.as_string())
             
         logger.info(f"Email sent to {config.recipient} successfully ({email_size_mb:.2f}MB)")
-        print(f"Email sent to {config.recipient} successfully")
-        print(f"Total email size: {email_size_mb:.2f}MB")
-        print(f"Files attached: {len(files_sent + error_files)}")
+        logger.info(f"Email sent to {config.recipient} successfully")
+        logger.info(f"Total email size: {email_size_mb:.2f}MB")
+        logger.info(f"Files attached: {len(files_sent + error_files)}")
         
         return DeliveryResult(
             success=True,
