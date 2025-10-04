@@ -297,9 +297,14 @@ jobs:
               if [ -n "$clean_name" ]; then
                 # Validate secret name format before exporting
                 if validate_secret_name "$clean_name"; then
-                  # Export the secret using GitHub Actions syntax (single quotes prevent command injection)
-                  echo "export $clean_name='${{ secrets.$clean_name }}'" >> /tmp/secrets_exports.sh
-                  echo "  🔒 Exported secret: $clean_name"
+                  # Export the secret using GitHub CLI (avoids invalid dynamic secret references)
+                  secret_value=$(gh secret get "$clean_name" --repo ${{ github.repository }} 2>/dev/null || echo "")
+                  if [ -n "$secret_value" ]; then
+                    echo "export $clean_name='$secret_value'" >> /tmp/secrets_exports.sh
+                    echo "  🔒 Exported secret: $clean_name"
+                  else
+                    echo "  ⚠️ Failed to retrieve secret: $clean_name"
+                  fi
                 fi
               fi
             fi
