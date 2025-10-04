@@ -187,10 +187,28 @@ jobs:
         prerelease: false
         generate_release_notes: false
         
-    - name: Clean up old releases
+    - name: Clean up old releases and workflow runs
       if: github.event_name == 'schedule'
       run: |
+        echo "🧹 Cleaning up old releases..."
         # Keep only the last 7 daily releases to avoid clutter
         gh release list --limit 50 | grep "daily-" | tail -n +8 | cut -f1 | xargs -r gh release delete -y
+
+        echo "🧹 Cleaning up old workflow runs..."
+        # Keep completed runs from the last 7 days, delete older ones
+        # This preserves recent successful runs while cleaning up old completed runs
+        gh run list --limit 50 --json status,conclusion,databaseId,number,createdAt | \
+        jq -r '.[] | select(
+          .status == "completed" and
+          (.createdAt | fromdateiso8601) < (now - 7*24*3600)
+        ) | .databaseId' | \
+        while read run_id; do
+          if [ -n "$run_id" ]; then
+            echo "Deleting workflow run: $run_id"
+            gh run delete "$run_id" --yes 2>/dev/null || echo "Failed to delete run $run_id (may not exist)"
+          fi
+        done
+
+        echo "✅ Cleanup completed"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
