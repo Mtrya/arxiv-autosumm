@@ -10,7 +10,7 @@ from typing import Optional, List
 from dataclasses import dataclass
 
 from .pipeline import (
-    Cacher, fetch,
+    Cacher, fetch_metadata, fetch_pdf,
     parse_fast, parse_vlm,
     rate_embed, rate_llm,
     summarize, render, deliver
@@ -24,27 +24,66 @@ class PaperMetadata:
     title: str
     pdf_url: str
     arxiv_id: str
+    cache_path: Optional[str]=None
     embed_score: Optional[float]=None
     llm_score: Optional[float]=None
     parsed_content: Optional[str]=None
     summary: Optional[str]=None
 
 def fetch_new_papers(category, cacher: Cacher, fetch_config: dict, verbose: bool = False) -> List[PaperMetadata]:
-    """Fetch new papers from ArXiv, check cache for duplicates."""
-    logger = logging.getLogger(__name__)
-    
-    try:
-        fetch_results = fetch(category, fetch_config)
-        papers = [PaperMetadata(
-            idx=idx,
-            title=result.title,
-            pdf_url=result.pdf_url,
-            arxiv_id=result.arxiv_id,
-        ) for idx,result in enumerate(fetch_results) if not cacher.is_paper_processed(result.arxiv_id)]
+    """
+    Fetch new papers from ArXiv with simplified PDF caching workflow.
 
-        for paper in papers:
+    Workflow: fetch-metadata -> download-all-pdfs -> filter-valid-papers -> load-cached-scores
+    """
+    logger = logging.getLogger(__name__)
+
+    try:
+        # Step 1: Fetch metadata from ArXiv and filter out already summarized papers
+        fetch_results = fetch_metadata(category, fetch_config)
+        new_results = [result for result in fetch_results if not cacher.is_paper_processed(result.arxiv_id)]
+        logger.info(f"Fetched {len(fetch_results)} papers from ArXiv, found {len(new_results)} new papers to process")
+
+        if not new_results:
+            return []
+
+        # Step 2: Create PaperMetadata objects and collect all PDF URLs
+        papers = []
+        pdf_urls = []
+        for idx, result in enumerate(new_results):
+            paper = PaperMetadata(
+                idx=idx,
+                title=result.title,
+                pdf_url=result.pdf_url,
+                arxiv_id=result.arxiv_id,
+            )
+            papers.append(paper)
+            pdf_urls.append(result.pdf_url)
+
+        # Step 3: Download all PDFs (fetch_pdf handles existence checking internally)
+        downloaded_paths = fetch_pdf(pdf_urls, str(cacher.pdf_cache_dir), fetch_config)
+
+        # Step 4: Assign cache paths and filter out papers without valid PDFs
+        valid_papers = []
+        for paper, pdf_path in zip(papers, downloaded_paths):
+            if pdf_path and os.path.exists(pdf_path):
+                paper.cache_path = pdf_path
+                valid_papers.append(paper)
+                if verbose:
+                    logger.debug(f"Valid PDF for {paper.arxiv_id}: {pdf_path}")
+            else:
+                logger.warning(f"No valid PDF for {paper.arxiv_id}")
+
+        logger.info(f"Returning {len(valid_papers)} papers with valid PDFs out of {len(papers)} total")
+
+        # Step 5: Clean up PDF cache if needed
+        used_pdf_urls = [paper.pdf_url for paper in valid_papers]
+        cacher.cleanup_pdf_cache(used_pdf_urls)
+
+        # Step 6: Load cached scores for valid papers
+        for paper in valid_papers:
             try:
-                paper.embed_score = cacher.get_similarity_score(paper.arxiv_id) # if not cached, will return None
+                paper.embed_score = cacher.get_similarity_score(paper.arxiv_id)
                 score = cacher.get_rating_score(paper.arxiv_id)
                 if score is not None:
                     paper.llm_score, _ = score
@@ -55,7 +94,7 @@ def fetch_new_papers(category, cacher: Cacher, fetch_config: dict, verbose: bool
                 paper.embed_score = None
                 paper.llm_score = None
 
-        return papers
+        return valid_papers
     except Exception as e:
         logger.error(f"Failed to fetch new papers: {e}", exc_info=True)
         return []
@@ -68,13 +107,13 @@ def parse_papers(papers: List[PaperMetadata], parse_config, vlm: bool, batch_con
         return []
     
     successfully_parsed = []
-    pdf_urls = [paper.pdf_url for paper in papers]
+    cache_paths = [paper.cache_path for paper in papers]
     
     try:
         if vlm:
-            parse_results = parse_vlm(pdf_urls, parse_config, batch_config)
+            parse_results = parse_vlm(cache_paths, parse_config, batch_config)
         else:
-            parse_results = parse_fast(pdf_urls, parse_config)
+            parse_results = parse_fast(cache_paths)
 
         for paper, result in zip(papers, parse_results):
             try:
@@ -233,9 +272,6 @@ def summarize_paper(papers: List[PaperMetadata], cacher: Cacher, summarize_confi
         logger.error(f"Summarize operation failed: {e}")
         return []
 
-
-
-
 def setup_logging(log_dir: str, send_log: bool, verbose: bool = False):
     """Set up logging with appropriate verbosity level"""
     level = logging.DEBUG if verbose else logging.INFO
@@ -262,6 +298,8 @@ def setup_logging(log_dir: str, send_log: bool, verbose: bool = False):
     logging.getLogger('urllib3').setLevel(logging.ERROR)
     
     return logging.getLogger(__name__), log_file_path
+
+
 
 def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[str]=None):
     """Main pipeline of ArXiv AutoSumm"""

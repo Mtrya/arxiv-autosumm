@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict, is_dataclass
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, List
 
 logger = logging.getLogger(__name__)
 
@@ -19,19 +19,24 @@ logger = logging.getLogger(__name__)
 class CacherConfig:
     dir: str
     ttl_days: int
+    max_pdf_cache_size_mb: int = 1024
 
 class Cacher:
     def __init__(self, config: CacherConfig):
         self.config = config
         self.cache_dir = Path(config.dir).expanduser()
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Database path only - no summary files directory
+
+        # Database path
         self.db_path = self.cache_dir / "cache.db"
-        
+
+        # PDF cache directory
+        self.pdf_cache_dir = self.cache_dir / "pdfs"
+        self.pdf_cache_dir.mkdir(parents=True, exist_ok=True)
+
         logger.info(f"Initializing cacher at {self.db_path}")
         logger.info(f"Cache TTL: {config.ttl_days} days")
-        
+
         # Initialize database
         self._init_database()
     
@@ -206,6 +211,7 @@ class Cacher:
         conn.close()
         logger.info(f"Marked paper {arxiv_id} as processed")
     
+        # PDF caching interface (simple, no over-engineering)
     # Config change detection & cache clearing
     def detect_and_handle_config_changes(self, current_config: Dict[str, Any]):
         """Detect config changes and clear appropriate caches."""
@@ -330,4 +336,73 @@ class Cacher:
         
         conn.close()
         return stats
- 
+
+    def cleanup_pdf_cache(self, used_pdf_urls: List[str]):
+        """
+        Remove unused PDFs if cache size exceeds max_pdf_cache_size_mb.
+        Removes a fraction of oldest unused PDFs when size limit is exceeded.
+
+        Args:
+            used_pdf_urls: List of PDF URLs used in current run
+        """
+        if not self.pdf_cache_dir.exists():
+            return
+
+        # Calculate current cache size
+        total_size = 0
+        pdf_files = []
+
+        for pdf_file in self.pdf_cache_dir.glob("*.pdf"):
+            file_size = pdf_file.stat().st_size
+            filename_hash = pdf_file.stem  # Remove .pdf extension
+            total_size += file_size
+            pdf_files.append({
+                'path': pdf_file,
+                'filename_hash': filename_hash,
+                'size': file_size,
+                'mtime': pdf_file.stat().st_mtime
+            })
+
+        total_size_mb = total_size / (1024 * 1024)
+
+        if total_size_mb <= self.config.max_pdf_cache_size_mb:
+            logger.debug(f"PDF cache size {total_size_mb:.2f}MB is within limit {self.config.max_pdf_cache_size_mb}MB")
+            return
+
+        logger.info(f"PDF cache size {total_size_mb:.2f}MB exceeds limit {self.config.max_pdf_cache_size_mb}MB, cleaning up...")
+
+        # Create set of used URL hashes
+        used_hashes_set = {hashlib.md5(url.encode()).hexdigest() for url in used_pdf_urls}
+
+        # Separate used and unused PDFs
+        unused_pdfs = [pdf for pdf in pdf_files if pdf['filename_hash'] not in used_hashes_set]
+
+        if not unused_pdfs:
+            logger.info("No unused PDFs to remove, cache contains only used files")
+            return
+
+        # Sort unused PDFs by modification time (oldest first)
+        unused_pdfs.sort(key=lambda x: x['mtime'])
+
+        # Calculate how much to remove (remove 25% of unused files or enough to get under limit)
+        target_size_mb = self.config.max_pdf_cache_size_mb * 0.8  # Target 80% of max size
+        size_to_remove_mb = total_size_mb - target_size_mb
+
+        removed_files = 0
+        removed_size_mb = 0
+
+        for pdf in unused_pdfs:
+            if removed_size_mb >= size_to_remove_mb and removed_files >= len(unused_pdfs) // 4:
+                break
+
+            try:
+                pdf['path'].unlink()
+                removed_size_mb += pdf['size'] / (1024 * 1024)
+                removed_files += 1
+                logger.debug(f"Removed unused PDF: {pdf['path']}")
+            except Exception as e:
+                logger.warning(f"Failed to remove PDF {pdf['path']}: {e}")
+
+        new_total_size_mb = total_size_mb - removed_size_mb
+        logger.info(f"Removed {removed_files} unused PDFs ({removed_size_mb:.2f}MB), "
+                   f"new cache size: {new_total_size_mb:.2f}MB")

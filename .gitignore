@@ -39,3 +39,7 @@ test_output
 # IDE
 .vscode/
 *~
+
+# Testing
+test
+test*

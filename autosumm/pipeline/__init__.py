@@ -1,6 +1,6 @@
 from .cache import Cacher, CacherConfig
 from .deliver import deliver, DelivererConfig, DeliveryResult
-from .fetch import fetch, FetcherConfig, FetchResult
+from .fetch import fetch_metadata, fetch_pdf, FetcherConfig, FetchResult
 from .parse import parse_fast, parse_vlm, ParserConfig, ParseResult, ParserVLMConfig
 from .rate import rate_embed, rate_llm, RaterConfig, RateResult, RaterEmbedderConfig, RaterLLMConfig, RaterEmbedderClient
 from .render import render, MarkdownRendererConfig, PDFRendererConfig, HTMLRendererConfig, AZW3RendererConfig, RendererConfig, RenderResult

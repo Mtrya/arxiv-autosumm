@@ -174,6 +174,7 @@ class FetcherConfig(BaseModel):
     days: int=8
     max_results: int=1000
     max_retries: int=10
+    download_timeout_seconds: int=224
 
     @field_validator('days')
     @classmethod
@@ -184,17 +185,23 @@ class FetcherConfig(BaseModel):
     @classmethod
     def validate_max_results(cls, v) -> int:
         return max(1,min(v,1000))
-    
+
     @field_validator('max_retries')
     @classmethod
     def validate_max_retries(cls,v) -> int:
         return max(1,min(v,100))
+
+    @field_validator('download_timeout_seconds')
+    @classmethod
+    def validate_download_timeout(cls, v) -> int:
+        return max(10,min(v,3600))
     
     def to_pipeline_config(self) -> 'FetcherConfig_':
         return FetcherConfig_(
             days=self.days,
             max_results=self.max_results,
-            max_retries=self.max_retries
+            max_retries=self.max_retries,
+            download_timeout_seconds=self.download_timeout_seconds
         )
 
 class SummarizerConfig(BaseModel):
@@ -477,14 +484,8 @@ class ParserVLMConfig(BaseModel):
 class ParserConfig(BaseModel):
     enable_vlm: bool=False
     tmp_dir: Optional[str]="./tmp"
-    fast_parser_timeout_seconds: int=224
     vlm: Optional[ParserVLMConfig]=None
     """If enable_vlm is False, then ParserVLMConfig is not required"""
-
-    @field_validator('fast_parser_timeout_seconds')
-    @classmethod
-    def validate_timeout(cls, v) -> int:
-        return max(10,min(v,3600))
 
     @field_validator('vlm')
     @classmethod
@@ -498,7 +499,6 @@ class ParserConfig(BaseModel):
         return ParserConfig_(
             enable_vlm=self.enable_vlm,
             tmp_dir=self.tmp_dir,
-            fast_parser_timeout_seconds=self.fast_parser_timeout_seconds,
             vlm=self.vlm.to_pipeline_config() if self.vlm else None
         )
 
@@ -519,11 +519,18 @@ class BatchConfig(BaseModel):
 class CacherConfig(BaseModel):
     dir: str="./cache"
     ttl_days: int=16
+    max_pdf_cache_size_mb: int=1024
+
+    @field_validator('max_pdf_cache_size_mb')
+    @classmethod
+    def validate_max_pdf_cache_size_mb(cls, v) -> int:
+        return max(1, min(v, 10240))  # Between 1MB and 10GB
 
     def to_pipeline_config(self):
         return CacherConfig_(
             dir=self.dir,
-            ttl_days=self.ttl_days
+            ttl_days=self.ttl_days,
+            max_pdf_cache_size_mb=self.max_pdf_cache_size_mb,
         )
 
 class MarkdownRendererConfig(BaseModel):

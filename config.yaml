@@ -8,7 +8,8 @@ run:
 fetch:
   days: env:FETCH_DAYS
   max_results: env:FETCH_RESULTS
-  max_retries: 10
+  max_retries: 3
+  download_timeout_seconds: 24
 
 summarize:
   provider: env:PROVIDER
@@ -63,7 +64,6 @@ rate:
 parse:
   enable_vlm: env:ENABLE_VLM
   tmp_dir: ./tmp
-  fast_parser_timeout_seconds: 300
   vlm:
     provider: env:PROVIDER
     api_key: env:OPENROUTER_API_KEY
@@ -87,6 +87,7 @@ render:
 cache:
   dir: ~/.cache/arxiv-autosumm/
   ttl_days: 16
+  max_pdf_cache_size_mb: 1024
 
 deliver:
   smtp_server: smtp.163.com

@@ -4,7 +4,6 @@ PDF parsing functionalities with fast and high-quality modes.
 
 import os
 import re
-import requests
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 from pathlib import Path
@@ -12,9 +11,7 @@ import fitz
 import base64
 from pdfminer.high_level import extract_text
 from pdfminer.layout import LAParams
-import io
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 try:
     from client import BaseClient, BatchConfig, UsageInfo
@@ -39,7 +36,6 @@ class ParserVLMConfig:
 class ParserConfig:
     enable_vlm: bool
     tmp_dir: str
-    fast_parser_timeout_seconds: int
     vlm: Optional[ParserVLMConfig]
 
 @dataclass
@@ -56,24 +52,20 @@ class ParseResult:
     error: Optional[str]=None
     method: str="fast"
 
-def _pdf_to_images(pdf_url: str, pdf_index: int, config: ParserVLMConfig, tmp_dir: str) -> List[ImageData]:
+def _pdf_to_images(cache_path: str, pdf_index: int, config: ParserVLMConfig, tmp_dir: str) -> List[ImageData]:
     """Convert a single PDF to images and return ImageData list"""
     image_data_list = []
 
     try:
-        # Download PDF if URL
-        if pdf_url.startswith(('http://', 'https://')):
-            logger.debug(f"Downloading PDF from URL: {pdf_url}")
-            response = requests.get(pdf_url)
-            response.raise_for_status()
-            
-            pdf_path = Path(tmp_dir) / f"temp_pdf_{pdf_index}.pdf"
-            pdf_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(pdf_path, 'wb') as f:
-                f.write(response.content)
-            logger.debug(f"Downloaded PDF to: {pdf_path}")
-        else:
-            pdf_path = Path(pdf_url)
+        # Route based on cache_path content
+        if cache_path is None:
+            logger.error(f"No cache path provided for PDF {pdf_index+1}")
+            return []
+        # Use cached PDF file
+        if not os.path.exists(cache_path):
+            logger.error(f"Cached PDF file not found: {cache_path}")
+            return []
+        pdf_path = Path(cache_path)
         
         # Convert to images using PyMuPDF
         pdf_document = fitz.open(pdf_path)
@@ -93,10 +85,6 @@ def _pdf_to_images(pdf_url: str, pdf_index: int, config: ParserVLMConfig, tmp_di
             ))
         
         pdf_document.close()
-        
-        # Clean up temporary PDF if downloaded
-        if pdf_url.startswith(('http://', 'https://')):
-            pdf_path.unlink(missing_ok=True)
             
     except Exception as e:
         logger.error(f"Error converting PDF {pdf_index} to images: {e}",exc_info=True)
@@ -200,7 +188,7 @@ class ParserVLMClient(BaseClient):
         """Override because 'http://localhost:11434/v1/chat/completions' return openai-compatible response"""
         return super()._handle_openai_response(response, is_streaming)
         
-def parse_vlm(pdf_urls: List[str], config: ParserConfig, batch_config: Optional[BatchConfig]=None) -> List[ParseResult]:
+def parse_vlm(cache_paths: List[Optional[str]], config: ParserConfig, batch_config: Optional[BatchConfig]=None) -> List[ParseResult]:
     """
     Main interface function for VLM parsing of multiple PDFs.
     
@@ -215,9 +203,9 @@ def parse_vlm(pdf_urls: List[str], config: ParserConfig, batch_config: Optional[
     all_image_data = []
     pdf_image_counts = []
     
-    for pdf_index, pdf_url in enumerate(pdf_urls):
-        logger.info(f"Processing PDF {pdf_index+1}/{len(pdf_urls)}: {pdf_url}")
-        image_data_list = _pdf_to_images(pdf_url,pdf_index,config.vlm,batch_config.tmp_dir)
+    for pdf_index, cache_path in enumerate(cache_paths):
+        logger.info(f"Processing PDF {pdf_index+1}/{len(cache_paths)}: {cache_path}")
+        image_data_list = _pdf_to_images(cache_path,pdf_index,config.vlm,batch_config.tmp_dir)
         all_image_data.extend(image_data_list)
         pdf_image_counts.append(len(image_data_list))
         logger.debug(f"Extracted {len(image_data_list)} pages from PDF {pdf_index+1}")
@@ -230,7 +218,7 @@ def parse_vlm(pdf_urls: List[str], config: ParserConfig, batch_config: Optional[
                 success=False,
                 error="No image extracted.",
                 method="vlm"
-            ) for _ in pdf_urls
+            ) for _ in cache_paths
         ]
 
     vlm_client = ParserVLMClient(config.vlm, batch_config)
@@ -255,101 +243,78 @@ def parse_vlm(pdf_urls: List[str], config: ParserConfig, batch_config: Optional[
 
     return results
 
-def _parse_fast_single(pdf_url: str, config: ParserConfig, pdf_index: int) -> ParseResult:
+def parse_fast(cache_paths: List[Optional[str]]) -> List[ParseResult]:
     """
-    Helper function to parse a single PDF in an isolated directory
-    Downloads the PDF (if URL), extracts text using pdfminer, and cleans it up
+    Fast parsing using pdfminer on cached PDF files.
+    Uses simple sequential processing - no multithreading needed for local file parsing.
+    Results are returned in the same order as the input cache_paths.
     """
+    logger.info(f"Starting fast parsing for {len(cache_paths)} PDFs")
 
-    # Uses the same logic in arxiv2text, but with timeout for requests, and perform PDF processing in-memory
-    # Time out actively to prevent never-finished job
-    # Although timing out most hanging jobs, some still escape due to unknown-reasons
+    results = []
 
-    try:
-        logger.debug(f"Processing PDF {pdf_index+1} ({pdf_url}) in worker {os.getpid()}")
+    for i, cache_path in enumerate(cache_paths):
+        logger.debug(f"Parsing PDF {i+1}/{len(cache_paths)}: {cache_path}")
 
-        content = ""
-        if pdf_url.startswith(('http://','https://')):
-            response = requests.get(pdf_url,timeout=config.fast_parser_timeout_seconds)
-            response.raise_for_status()
-            with io.BytesIO(response.content) as pdf_stream:
-                content = extract_text(pdf_stream, laparams=LAParams())
-        else:
-            with open(pdf_url, 'rb') as pdf_file:
-                content = extract_text(pdf_file, laparams=LAParams)
-
-        # Remove inappropriate line breaks within paragraphs to form coherent sentences.
-        content = re.sub(r'(?<!\n)\n(?!\n)', ' ', content)
-
-        logger.debug(f"Successfully parsed PDF {pdf_index+1} ({pdf_url})")
-        return ParseResult(
-            content = content.strip(),
-            success=True,
-            error=None,
-            method="fast"
-        )
-    except requests.exceptions.Timeout:
-        logger.error(f"Timeout when downloading PDF {pdf_index+1} ({pdf_url})")
-        return ParseResult(
-            content="",
-            success=False,
-            error=f"Download timed out after {config.fast_parser_timeout_seconds} seconds",
-            method="fast"
-        )
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to download PDF {pdf_index+1} ({pdf_url}): {e}")
-        return ParseResult(
-            content="",
-            success=False,
-            error=f"Parsing failed: {e}",
-            method="fast"
-        )
-            
-def parse_fast(pdf_urls: List[str], config: ParserConfig) -> List[ParseResult]:
-    """
-    Fast parsing using requests and pdfminer.
-    Uses multithreading to accelerate PDF parsing. Results are returned in the same order as the input pdf_urls.
-    """
-    logger.info(f"Starting fast parsing for {len(pdf_urls)} PDFs using multithreading")
-
-    results = [None] * len(pdf_urls)
-
-    with ThreadPoolExecutor() as executor:
-        # Submit all tasks
-        future_to_index = {
-            executor.submit(_parse_fast_single, url, config, i): i
-            for i, url in enumerate(pdf_urls)
-        }
-
-        # Collect results as they complete and place them in the correct spot
-        for future in as_completed(future_to_index):
-            index = future_to_index[future]
-            pdf_url = pdf_urls[index]
-            try:
-                # Add a per-job timeout as a safeguard against hanging parsers
-                result = future.result(timeout=config.fast_parser_timeout_seconds)
-                results[index] = result
-            except TimeoutError:
-                logger.warning(f"Parsing timed out for PDF: {pdf_url}")
-                results[index] = ParseResult(
+        # Inline parsing logic - no need for separate function
+        try:
+            # Validate cache_path
+            if cache_path is None:
+                results.append(ParseResult(
                     content="",
                     success=False,
-                    error=f"Parsing timed out after {config.fast_parser_timeout_seconds} seconds.",
+                    error="No cache path provided",
                     method="fast"
-                )
-            except Exception as e:
-                logger.error(f"An unexpected error occurred while parsing PDF {pdf_url}: {e}")
-                results[index] = ParseResult(
+                ))
+                continue
+
+            # Should be a local file, not URL
+            if cache_path.startswith(('http://','https://')):
+                results.append(ParseResult(
                     content="",
                     success=False,
-                    error=f"An unexpected error occurred: {e}",
+                    error=f"Expected local file path, got URL: {cache_path}",
                     method="fast"
-                )
-    
-    successful_count = sum(1 for r in results if r and r.success)
+                ))
+                continue
+
+            # Check if file exists
+            if not os.path.exists(cache_path):
+                results.append(ParseResult(
+                    content="",
+                    success=False,
+                    error=f"Cached PDF file not found: {cache_path}",
+                    method="fast"
+                ))
+                continue
+
+            # Extract text from local file
+            with open(cache_path, 'rb') as pdf_file:
+                content = extract_text(pdf_file, laparams=LAParams())
+
+            # Remove inappropriate line breaks within paragraphs to form coherent sentences.
+            content = re.sub(r'(?<!\n)\n(?!\n)', ' ', content)
+
+            results.append(ParseResult(
+                content=content.strip(),
+                success=True,
+                error=None,
+                method="fast"
+            ))
+
+        except Exception as e:
+            logger.error(f"Error processing PDF {i+1} ({cache_path}): {e}")
+            results.append(ParseResult(
+                content="",
+                success=False,
+                error=f"Parsing failed: {e}",
+                method="fast"
+            ))
+
+    successful_count = sum(1 for r in results if r.success)
     failed_count = len(results) - successful_count
     logger.info(f"Fast parsing completed: {successful_count} successful, {failed_count} failed")
-        
+
     return results
     
 
