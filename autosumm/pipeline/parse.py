@@ -14,9 +14,9 @@ from pdfminer.layout import LAParams
 import logging
 
 try:
-    from client import BaseClient, BatchConfig, UsageInfo
+    from client import BaseClient, BatchConfig
 except:
-    from .client import BaseClient, BatchConfig, UsageInfo
+    from .client import BaseClient, BatchConfig
 
 logger = logging.getLogger(__name__)
 
@@ -258,36 +258,6 @@ def parse_fast(cache_paths: List[Optional[str]]) -> List[ParseResult]:
 
         # Inline parsing logic - no need for separate function
         try:
-            # Validate cache_path
-            if cache_path is None:
-                results.append(ParseResult(
-                    content="",
-                    success=False,
-                    error="No cache path provided",
-                    method="fast"
-                ))
-                continue
-
-            # Should be a local file, not URL
-            if cache_path.startswith(('http://','https://')):
-                results.append(ParseResult(
-                    content="",
-                    success=False,
-                    error=f"Expected local file path, got URL: {cache_path}",
-                    method="fast"
-                ))
-                continue
-
-            # Check if file exists
-            if not os.path.exists(cache_path):
-                results.append(ParseResult(
-                    content="",
-                    success=False,
-                    error=f"Cached PDF file not found: {cache_path}",
-                    method="fast"
-                ))
-                continue
-
             # Extract text from local file
             with open(cache_path, 'rb') as pdf_file:
                 content = extract_text(pdf_file, laparams=LAParams())
@@ -345,8 +315,7 @@ Your **sole** mission is to analyze the image document and return it in **markdo
 
 
     pdf_url = "http://arxiv.org/pdf/1706.03762"
-    #result = parse_vlm([pdf_url], config, batch_config)[0]
-    result = parse_fast([pdf_url], config)[0]
+    result = parse_vlm([pdf_url], config, batch_config)[0]
 
     print(f"VLM parsing success: {result.success}")
     print(f"Content:\n{result.content}")

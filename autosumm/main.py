@@ -40,9 +40,9 @@ def fetch_new_papers(category, cacher: Cacher, fetch_config: dict, verbose: bool
 
     try:
         # Step 1: Fetch metadata from ArXiv and filter out already summarized papers
-        fetch_results = fetch_metadata(category, fetch_config)
-        new_results = [result for result in fetch_results if not cacher.is_paper_processed(result.arxiv_id)]
-        logger.info(f"Fetched {len(fetch_results)} papers from ArXiv, found {len(new_results)} new papers to process")
+        metadata_results = fetch_metadata(category, fetch_config)
+        new_results = [result for result in metadata_results if not cacher.is_paper_processed(result.arxiv_id)]
+        logger.info(f"Fetched {len(metadata_results)} papers from ArXiv, found {len(new_results)} new papers to process")
 
         if not new_results:
             return []
@@ -60,17 +60,18 @@ def fetch_new_papers(category, cacher: Cacher, fetch_config: dict, verbose: bool
             papers.append(paper)
             pdf_urls.append(result.pdf_url)
 
-        # Step 3: Download all PDFs (fetch_pdf handles existence checking internally)
-        downloaded_paths = fetch_pdf(pdf_urls, str(cacher.pdf_cache_dir), fetch_config)
+        # Step 3: Download & extract text from all PDFs
+        pdf_results = fetch_pdf(pdf_urls, str(cacher.pdf_cache_dir), fetch_config)
 
         # Step 4: Assign cache paths and filter out papers without valid PDFs
         valid_papers = []
-        for paper, pdf_path in zip(papers, downloaded_paths):
-            if pdf_path and os.path.exists(pdf_path):
-                paper.cache_path = pdf_path
+        for paper, pdf_result in zip(papers, pdf_results):
+            if pdf_result.extraction_success and pdf_result.extracted_text and pdf_result.cache_path and os.path.exists(pdf_result.cache_path):
+                paper.cache_path = pdf_result.cache_path
+                paper.parsed_content = pdf_result.extracted_text
                 valid_papers.append(paper)
                 if verbose:
-                    logger.debug(f"Valid PDF for {paper.arxiv_id}: {pdf_path}")
+                    logger.debug(f"Valid PDF for {paper.arxiv_id}: {pdf_result.cache_path}")
             else:
                 logger.warning(f"No valid PDF for {paper.arxiv_id}")
 
@@ -353,15 +354,15 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
             return
         
         # 4. Parse papers (coarse)
-        logger.info("Parsing papers (coarse parsing with pdfminer)...")
-        papers = parse_papers(papers, config["parse"], vlm=False, verbose=verbose)
-        logger.info(f"Successfully parsed {len(papers)} papers")
+        #logger.info("Parsing papers (coarse parsing with pdfminer)...")
+        #papers = parse_papers(papers, config["parse"], vlm=False, verbose=verbose)
+        #logger.info(f"Successfully parsed {len(papers)} papers")
         
-        if not papers:
-            logger.warning("No papers could be parsed, exiting pipeline")
-            if log_file_path:
-                deliver([log_file_path], config[deliver])
-            return
+        #if not papers:
+        #    logger.warning("No papers could be parsed, exiting pipeline")
+        #    if log_file_path:
+        #        deliver([log_file_path], config[deliver])
+        #    return
 
         # 5&6&7. Rate papers (with embedder) + cache embedder ratings + select top-k papers
         if config["rate"].strategy in ["embedder","hybrid"]:

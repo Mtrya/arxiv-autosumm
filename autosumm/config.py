@@ -174,7 +174,7 @@ class FetcherConfig(BaseModel):
     days: int=8
     max_results: int=1000
     max_retries: int=10
-    download_timeout_seconds: int=224
+    operation_timeout_seconds: int=224
 
     @field_validator('days')
     @classmethod
@@ -191,9 +191,9 @@ class FetcherConfig(BaseModel):
     def validate_max_retries(cls,v) -> int:
         return max(1,min(v,100))
 
-    @field_validator('download_timeout_seconds')
+    @field_validator('operation_timeout_seconds')
     @classmethod
-    def validate_download_timeout(cls, v) -> int:
+    def validate_operation_timeout(cls, v) -> int:
         return max(10,min(v,3600))
     
     def to_pipeline_config(self) -> 'FetcherConfig_':
@@ -201,7 +201,7 @@ class FetcherConfig(BaseModel):
             days=self.days,
             max_results=self.max_results,
             max_retries=self.max_retries,
-            download_timeout_seconds=self.download_timeout_seconds
+            operation_timeout_seconds=self.operation_timeout_seconds
         )
 
 class SummarizerConfig(BaseModel):

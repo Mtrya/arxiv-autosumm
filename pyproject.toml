@@ -32,7 +32,8 @@ dependencies = [
     "python-dotenv>=0.9.9",
     "typer>=0.12.3",
     "pymarkdownlnt>=0.9.31",
-    "pdfminer-six>=20250506"
+    "pdfminer-six>=20250506",
+    "mineru[core]>=2.5.4",
 ]
 
 [project.scripts]

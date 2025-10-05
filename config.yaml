@@ -9,7 +9,7 @@ fetch:
   days: env:FETCH_DAYS
   max_results: env:FETCH_RESULTS
   max_retries: 3
-  download_timeout_seconds: 24
+  operation_timeout_seconds: 24
 
 summarize:
   provider: env:PROVIDER
