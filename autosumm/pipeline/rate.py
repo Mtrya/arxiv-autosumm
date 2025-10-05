@@ -292,7 +292,7 @@ class RaterLLMClient(BaseClient):
         messages.append({"role": "user", "content": user_content})
         return messages
 
-    def process_single(self, input_data, sleep_time = 2.0, return_usage=False):
+    def process_single(self, input_data, sleep_time = 2.5, return_usage=False):
         """Process single input, raising exception on failure."""
         result, usage_info = super().process_single(input_data, sleep_time, return_usage=True)
         if return_usage:
@@ -317,9 +317,9 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
                 # Text fits, get similarity directly
                 similarity_score, usage_info = embedder_client._process_single_with_usage(content)
                 if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):
-                    logger.debug(f"Rated paper with embedder {usage_info}")
+                    logger.info(f"Rated paper with embedder {usage_info}")
                 else:
-                    logger.debug(f"Rated paper with embedder {embedder_client.config.model} (usage info unavailable)")
+                    logger.info(f"Rated paper with embedder {embedder_client.config.model} (usage info unavailable)")
             else:
                 # Text too long, chunk and get weighted average
                 chunks = chunk_text(content, embedder_client.context_length)
@@ -343,7 +343,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
                     weighted_similarity = None
                 
                 similarity_score = weighted_similarity
-                logger.debug(f"Rated paper with embedder {embedder_client.config.model} ({len(chunks)} chunks)")
+                logger.info(f"Rated paper with embedder {embedder_client.config.model} ({len(chunks)} chunks)")
             
             results.append(RateResult(
                 score=similarity_score if similarity_score is not None else 0.0,
@@ -382,9 +382,9 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
                 )
             )
             if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):
-                logger.debug(f"Rated paper with {usage_info}")
+                logger.info(f"Rated paper with {usage_info}")
             else:
-                logger.debug(f"Rated paper with {client.config.model} (usage info unavailable)")
+                logger.info(f"Rated paper with {client.config.model} (usage info unavailable)")
         logger.info(f"LLM rating completed: {len([r for r in final_results if r.success])} successful")
         return final_results
 

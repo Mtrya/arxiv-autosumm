@@ -129,7 +129,7 @@ def render_md(summaries: List[str], category: str, config: RendererConfig) -> Re
         with preserve_logging_handlers():
             with Pool() as pool:
                 fixed_summaries = pool.map(_fix_single_markdown,summaries)
-            logger.debug("Successfully fixed markdown in a separate process.")
+            logger.info("Successfully fixed markdown in a separate process.")
     except Exception as e:
         logger.warning(f"Markdown fixing in a subprocess failed: {e}. Falling back to raw markdown.")
         fixed_summaries = summaries
@@ -663,7 +663,7 @@ def render(summaries: List[str], category: str, config: RendererConfig) -> List[
         reordered_formats.append("md")
 
     for format_name in reordered_formats:
-        logger.debug(f"Rendering format: {format_name}")
+        logger.info(f"Rendering format: {format_name}")
         if format_name == "md":
             result = render_md(summaries, category, config)
         elif format_name == "pdf":

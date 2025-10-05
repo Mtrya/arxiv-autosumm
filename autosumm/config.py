@@ -482,10 +482,10 @@ class ParserVLMConfig(BaseModel):
         )
 
 class ParserConfig(BaseModel):
-    enable_vlm: bool=False
+    method: Optional[str]="text-extraction"
     tmp_dir: Optional[str]="./tmp"
     vlm: Optional[ParserVLMConfig]=None
-    """If enable_vlm is False, then ParserVLMConfig is not required"""
+    """If method is 'vlm', then ParserVLMConfig is not required"""
 
     @field_validator('vlm')
     @classmethod
@@ -497,7 +497,7 @@ class ParserConfig(BaseModel):
     
     def to_pipeline_config(self):
         return ParserConfig_(
-            enable_vlm=self.enable_vlm,
+            method=self.method,
             tmp_dir=self.tmp_dir,
             vlm=self.vlm.to_pipeline_config() if self.vlm else None
         )

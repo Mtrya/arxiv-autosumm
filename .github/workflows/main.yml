@@ -2,8 +2,8 @@ name: ArXiv AutoSumm Daily
 
 on:
   schedule:
-    # Run daily at 22:00 UTC (adjust as needed)
-    - cron: '0 22 * * *'
+    # Run daily at 00:00 UTC (adjust as needed)
+    - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
       category:
@@ -34,7 +34,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
 
-  
     - name: Cache ArXiv Paper Database
       uses: actions/cache@v4
       with:
@@ -105,7 +104,6 @@ jobs:
         echo "✅ Group B secrets export completed"
 
         # Export Custom Secrets (manually added)
-        echo "MINERU_TOKEN=${{ secrets.MINERU_TOKEN }}" >> $GITHUB_ENV
         echo "✅ Custom secrets export completed"
 
         echo "✅ Repository variables and secrets export completed"
@@ -144,10 +142,10 @@ jobs:
       run: |
         if [ "${{ github.event.inputs.category }}" != "" ]; then
           echo "Running with specified category: ${{ github.event.inputs.category }}"
-          python -m autosumm.cli run --config config.yaml --verbose --specify-category "${{ github.event.inputs.category }}"
+          python -m autosumm.cli run --config config.yaml --specify-category "${{ github.event.inputs.category }}"
         else
           echo "Running with default categories from config"
-          python -m autosumm.cli run --config config.yaml --verbose
+          python -m autosumm.cli run --config config.yaml
         fi
 
     - name: Upload outputs as artifacts

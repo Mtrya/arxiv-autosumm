@@ -62,7 +62,7 @@ rate:
         weight: 0.1
 
 parse:
-  enable_vlm: env:ENABLE_VLM
+  method: env:PARSE_METHOD
   tmp_dir: ./tmp
   vlm:
     provider: env:PROVIDER
@@ -87,7 +87,7 @@ render:
 cache:
   dir: ~/.cache/arxiv-autosumm/
   ttl_days: 16
-  max_pdf_cache_size_mb: 1024
+  max_pdf_cache_size_mb: 4096
 
 deliver:
   smtp_server: smtp.163.com

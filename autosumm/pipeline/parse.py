@@ -34,7 +34,7 @@ class ParserVLMConfig:
 
 @dataclass
 class ParserConfig:
-    enable_vlm: bool
+    method: str
     tmp_dir: str
     vlm: Optional[ParserVLMConfig]
 
@@ -188,7 +188,7 @@ class ParserVLMClient(BaseClient):
         """Override because 'http://localhost:11434/v1/chat/completions' return openai-compatible response"""
         return super()._handle_openai_response(response, is_streaming)
         
-def parse_vlm(cache_paths: List[Optional[str]], config: ParserConfig, batch_config: Optional[BatchConfig]=None) -> List[ParseResult]:
+def parse_vlm(cache_paths: List[str], config: ParserConfig, batch_config: Optional[BatchConfig]=None) -> List[ParseResult]:
     """
     Main interface function for VLM parsing of multiple PDFs.
     
@@ -208,7 +208,7 @@ def parse_vlm(cache_paths: List[Optional[str]], config: ParserConfig, batch_conf
         image_data_list = _pdf_to_images(cache_path,pdf_index,config.vlm,batch_config.tmp_dir)
         all_image_data.extend(image_data_list)
         pdf_image_counts.append(len(image_data_list))
-        logger.debug(f"Extracted {len(image_data_list)} pages from PDF {pdf_index+1}")
+        logger.info(f"Extracted {len(image_data_list)} pages from PDF {pdf_index+1}")
     
     if not all_image_data:
         logger.warning("No images extracted from any PDF")
@@ -229,11 +229,11 @@ def parse_vlm(cache_paths: List[Optional[str]], config: ParserConfig, batch_conf
     else:
         vlm_results = []
         for image_data in all_image_data:
-            result, usage_info = vlm_client._process_single_with_usage(image_data, sleep_time=2)
+            result, usage_info = vlm_client._process_single_with_usage(image_data, sleep_time=3)
             if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):
-                logger.debug(f"Converted image with {usage_info}")
+                logger.info(f"Converted image with {usage_info}")
             else:
-                logger.debug(f"Converted image with {vlm_client.config.model} (usage info unavailable)")
+                logger.info(f"Converted image with {vlm_client.config.model} (usage info unavailable)")
             vlm_results.append(result)
     
     results = _reconstruct_results(vlm_results, pdf_image_counts)
@@ -243,50 +243,10 @@ def parse_vlm(cache_paths: List[Optional[str]], config: ParserConfig, batch_conf
 
     return results
 
-def parse_fast(cache_paths: List[Optional[str]]) -> List[ParseResult]:
+def parse_mineru(cache_paths: List[str], config: ParserConfig, batch_config: Optional[BatchConfig]=None) -> List[ParseResult]:
     """
-    Fast parsing using pdfminer on cached PDF files.
-    Uses simple sequential processing - no multithreading needed for local file parsing.
-    Results are returned in the same order as the input cache_paths.
+    Main interface function for MinerU parsing of multiple PDFs.
     """
-    logger.info(f"Starting fast parsing for {len(cache_paths)} PDFs")
-
-    results = []
-
-    for i, cache_path in enumerate(cache_paths):
-        logger.debug(f"Parsing PDF {i+1}/{len(cache_paths)}: {cache_path}")
-
-        # Inline parsing logic - no need for separate function
-        try:
-            # Extract text from local file
-            with open(cache_path, 'rb') as pdf_file:
-                content = extract_text(pdf_file, laparams=LAParams())
-
-            # Remove inappropriate line breaks within paragraphs to form coherent sentences.
-            content = re.sub(r'(?<!\n)\n(?!\n)', ' ', content)
-
-            results.append(ParseResult(
-                content=content.strip(),
-                success=True,
-                error=None,
-                method="fast"
-            ))
-
-        except Exception as e:
-            logger.error(f"Error processing PDF {i+1} ({cache_path}): {e}")
-            results.append(ParseResult(
-                content="",
-                success=False,
-                error=f"Parsing failed: {e}",
-                method="fast"
-            ))
-
-    successful_count = sum(1 for r in results if r.success)
-    failed_count = len(results) - successful_count
-    logger.info(f"Fast parsing completed: {successful_count} successful, {failed_count} failed")
-
-    return results
-    
 
 if __name__ == "__main__":
     vlm_config = ParserVLMConfig(

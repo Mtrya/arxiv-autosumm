@@ -122,7 +122,7 @@ class Cacher:
         conn.close()
         
         if result:
-            logger.debug(f"Cache hit: similarity score for {arxiv_id} = {result[0]}")
+            logger.info(f"Cache hit: similarity score for {arxiv_id} = {result[0]}")
             return result[0]
         else:
             logger.debug(f"Cache miss: no similarity score for {arxiv_id}")
@@ -158,7 +158,7 @@ class Cacher:
         if result:
             score, details_json = result
             details = json.loads(details_json)
-            logger.debug(f"Cache hit: rating score for {arxiv_id} = {score}")
+            logger.info(f"Cache hit: rating score for {arxiv_id} = {score}")
             return score, details
         else:
             logger.debug(f"Cache miss: no rating score for {arxiv_id}")

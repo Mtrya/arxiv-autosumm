@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from .pipeline import (
     Cacher, fetch_metadata, fetch_pdf,
-    parse_fast, parse_vlm,
+    parse_vlm, parse_mineru,
     rate_embed, rate_llm,
     summarize, render, deliver
 )
@@ -100,7 +100,7 @@ def fetch_new_papers(category, cacher: Cacher, fetch_config: dict, verbose: bool
         logger.error(f"Failed to fetch new papers: {e}", exc_info=True)
         return []
 
-def parse_papers(papers: List[PaperMetadata], parse_config, vlm: bool, batch_config=None, verbose: bool = False) -> List[PaperMetadata]:
+def parse_papers(papers: List[PaperMetadata], parse_config, batch_config=None, verbose: bool = False) -> List[PaperMetadata]:
     """Assign value for parsed_content field using parse_fast or parse_vlm"""
     logger = logging.getLogger(__name__)
     
@@ -111,10 +111,15 @@ def parse_papers(papers: List[PaperMetadata], parse_config, vlm: bool, batch_con
     cache_paths = [paper.cache_path for paper in papers]
     
     try:
-        if vlm:
+        if parse_config.method == "text-extraction":
+            return papers # return directly, because we already have simple text extraction result in fetch_pdf
+        elif parse_config.method == "vlm":
             parse_results = parse_vlm(cache_paths, parse_config, batch_config)
+        elif parse_config.method == "mineru":
+            parse_results = parse_mineru(cache_paths, parse_config, batch_config)
         else:
-            parse_results = parse_fast(cache_paths)
+            logger.warning(f"Parse method '{parse_config.method}' not recognized, continue with 'text-extraction'.")
+            return papers
 
         for paper, result in zip(papers, parse_results):
             try:
@@ -342,7 +347,7 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
             category = categories[int(today.strftime('%j')) % len(categories)]
         logger.info(f"Processing category: {category} for date {today}")
 
-        # 2&3. Fetch paper metadata and get cached ratings
+        # 2&3. Fetch paper metadata, download pdf, get extracted text and cached ratings
         logger.info("Fetching new papers...")
         papers = fetch_new_papers(category, cacher, config["fetch"], verbose=verbose)
         logger.info(f"Found {len(papers)} new papers to process")
@@ -352,19 +357,8 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
             if log_file_path:
                 deliver([log_file_path], config[deliver])
             return
-        
-        # 4. Parse papers (coarse)
-        #logger.info("Parsing papers (coarse parsing with pdfminer)...")
-        #papers = parse_papers(papers, config["parse"], vlm=False, verbose=verbose)
-        #logger.info(f"Successfully parsed {len(papers)} papers")
-        
-        #if not papers:
-        #    logger.warning("No papers could be parsed, exiting pipeline")
-        #    if log_file_path:
-        #        deliver([log_file_path], config[deliver])
-        #    return
 
-        # 5&6&7. Rate papers (with embedder) + cache embedder ratings + select top-k papers
+        # 4&5&6. Rate papers (with embedder) + cache embedder ratings + select top-k papers
         if config["rate"].strategy in ["embedder","hybrid"]:
             logger.info("Rating papers with embedding model...")
             papers = select_papers_embed(papers, cacher, config["rate"], config["batch"], verbose=verbose)
@@ -373,7 +367,7 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
             strategy = config["rate"].strategy
             logger.info(f"Skipping embedder rating (using strategy `{strategy}`)")
 
-        # 8&9&10. Rate papers (with llm) + cache llm ratings + select max_selected papers to summarize
+        # 7&8&9. Rate papers (with llm) + cache llm ratings + select max_selected papers to summarize
         if config["rate"].strategy in ["llm","hybrid"]:
             logger.info("Rating papers with LLM...")
             papers = select_papers_llm(papers, cacher, config["rate"], config["batch"], verbose=verbose)
@@ -390,13 +384,12 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
                 deliver([log_file_path], config[deliver])
             return
 
-        # 11. Parse papers (fine)
-        if config["parse"].enable_vlm:
-            logger.info("Parsing papers (fine parsing with VLM)...")
-            papers = parse_papers(papers, config["parse"], vlm=True, batch_config=config["batch"], verbose=verbose)
-            logger.info(f"Successfully refined {len(papers)} papers")
+        # 10. Parse papers
+        logger.info("Parsing papers (to get LLM-native markdown)...")
+        papers = parse_papers(papers, config["parse"], batch_config=config["batch"], verbose=verbose)
+        logger.info(f"Successfully refined {len(papers)} papers")
 
-        # 12&13. Summarize selected papers, track selected papers
+        # 11&12. Summarize selected papers, track selected papers
         logger.info("Summarizing papers...")
         papers = summarize_paper(papers, cacher, config["summarize"], config["render"], config["batch"], verbose=verbose)
         logger.info(f"Successfully summarized {len(papers)} papers")
@@ -407,13 +400,13 @@ def run_pipeline(config_path, verbose: bool=False, specified_category: Optional[
                 deliver([log_file_path], config[deliver])
             return
 
-        # 14. Render
+        # 13. Render
         logger.info("Rendering summaries...")
         summaries = [p.summary for p in papers]
         render_result = render(summaries, category, config["render"])
         logger.info(f"Rendered summaries to {len(render_result)} formats")
 
-        # 15. Deliver
+        # 14. Deliver
         paths = [r.path for r in render_result]
         if log_file_path:
             paths.append(log_file_path)

@@ -128,7 +128,7 @@ def _extract_text_from_bytes(pdf_bytes: bytes) -> str:
 def _extract_from_cached_file(cache_path: Path, pdf_url: str, index: int) -> FetchResult:
     """Extract text from already cached PDF file."""
     try:
-        logger.debug(f"Cache hit for PDF {index+1}: {cache_path}")
+        logger.info(f"Cache hit for PDF {index+1}: {cache_path}")
 
         # Read and extract text from cached file
         with open(cache_path, 'rb') as pdf_file:
@@ -136,7 +136,7 @@ def _extract_from_cached_file(cache_path: Path, pdf_url: str, index: int) -> Fet
 
         content = _extract_text_from_bytes(pdf_bytes)
 
-        logger.debug(f"Successfully extracted text from cached PDF {index+1} ({pdf_url})")
+        logger.info(f"Successfully extracted text from cached PDF {index+1} ({pdf_url})")
 
         return FetchResult(
             title="", pdf_url=pdf_url, authors=[], entry_id="", arxiv_id="",
@@ -160,7 +160,7 @@ def _extract_from_cached_file(cache_path: Path, pdf_url: str, index: int) -> Fet
 
 def _download_extract_and_cache(pdf_url: str, cache_path: Path, config: FetcherConfig, index: int) -> FetchResult:
     """Download PDF, extract text in-memory, then save to cache."""
-    logger.debug(f"Downloading PDF {index+1}: {pdf_url}")
+    logger.info(f"Downloading PDF {index+1}: {pdf_url}")
 
     downloaded_successfully = False
     pdf_bytes = None
@@ -192,7 +192,7 @@ def _download_extract_and_cache(pdf_url: str, cache_path: Path, config: FetcherC
     # Extract text from downloaded bytes (optimal: no disk I/O yet)
     try:
         content = _extract_text_from_bytes(pdf_bytes)
-        logger.debug(f"Successfully extracted text from downloaded PDF {index+1} ({pdf_url})")
+        logger.info(f"Successfully extracted text from downloaded PDF {index+1} ({pdf_url})")
 
         # Validate and save to cache after successful text extraction
         if pdf_bytes.startswith(b'%PDF-'):
@@ -206,7 +206,7 @@ def _download_extract_and_cache(pdf_url: str, cache_path: Path, config: FetcherC
                 if len(doc) > 0:
                     doc.close()
                     temp_path.rename(cache_path)
-                    logger.debug(f"Successfully saved PDF {index+1} to cache: {cache_path}")
+                    logger.info(f"Successfully saved PDF {index+1} to cache: {cache_path}")
                 else:
                     temp_path.unlink(missing_ok=True)
                     logger.warning(f"Downloaded PDF has no pages: {pdf_url}")

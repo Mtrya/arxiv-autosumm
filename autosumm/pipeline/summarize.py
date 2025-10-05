@@ -107,9 +107,9 @@ def summarize(parsed_contents: List[str], config: SummarizerConfig, batch_config
             result, usage_info = client._process_single_with_usage(content, sleep_time=60)
             results.append(result)
             if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):
-                logger.debug(f"Summarized paper with {usage_info}")
+                logger.info(f"Summarized paper with {usage_info}")
             else:
-                logger.debug(f"Summarized paper with {client.config.model} (usage info unavailable)")
+                logger.info(f"Summarized paper with {client.config.model} (usage info unavailable)")
 
         final_results = [
             SummaryResult(
