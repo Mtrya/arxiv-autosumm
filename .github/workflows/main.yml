@@ -92,6 +92,7 @@ jobs:
         echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> $GITHUB_ENV
         echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" >> $GITHUB_ENV
         echo "MINIMAX_API_KEY=${{ secrets.MINIMAX_API_KEY }}" >> $GITHUB_ENV
+        echo "MISTRAL_API_KEY=${{ secrets.MISTRAL_API_KEY }}" >> $GITHUB_ENV
         echo "MODELSCOPE_API_KEY=${{ secrets.MODELSCOPE_API_KEY }}" >> $GITHUB_ENV
         echo "MOONSHOT_API_KEY=${{ secrets.MOONSHOT_API_KEY }}" >> $GITHUB_ENV
         echo "OLLAMA_API_KEY=${{ secrets.OLLAMA_API_KEY }}" >> $GITHUB_ENV
@@ -118,21 +119,36 @@ jobs:
       run: |
         mkdir -p ~/.cache/arxiv-autosumm/
 
-    - name: Extract output directory from config
-      id: extract_output
+    - name: Extract configuration from config.yaml
+      id: extract_config
       run: |
         if [ -f "config.yaml" ]; then
-          # Try to extract output_dir from render section
+          echo "📋 Reading configuration from config.yaml"
+
+          # Extract output_dir from render section
           OUTPUT_DIR=$(grep -A5 "render:" config.yaml | grep "output_dir" | sed 's/.*output_dir: *//' | tr -d '"' | tr -d "'" || echo "./output")
-          # Fallback to ./output if extraction fails
           if [ -z "$OUTPUT_DIR" ]; then
             OUTPUT_DIR="./output"
           fi
+          echo "OUTPUT_DIR=$OUTPUT_DIR" >> $GITHUB_ENV
+          echo "output_dir=$OUTPUT_DIR" >> $GITHUB_OUTPUT
+          echo "📁 Output directory: $OUTPUT_DIR"
+
+          # Check if parse.method is set to mineru
+          PARSE_METHOD=$(grep -A10 "parse:" config.yaml | grep "method:" | sed 's/.*method: *//' | tr -d '"' | tr -d "'" || echo "")
+          if [ "$PARSE_METHOD" = "mineru" ]; then
+            echo "use_mineru=true" >> $GITHUB_OUTPUT
+            echo "✅ MinerU parsing detected, will cache ModelScope models"
+          else
+            echo "use_mineru=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ Parse method is '$PARSE_METHOD', skipping ModelScope cache"
+          fi
         else
-          OUTPUT_DIR="./output"
+          echo "⚠️ No config.yaml found, using defaults"
+          echo "OUTPUT_DIR=./output" >> $GITHUB_ENV
+          echo "output_dir=./output" >> $GITHUB_OUTPUT
+          echo "use_mineru=false" >> $GITHUB_OUTPUT
         fi
-        echo "OUTPUT_DIR=$OUTPUT_DIR" >> $GITHUB_ENV
-        echo "Extracted output directory: $OUTPUT_DIR"
 
     - name: Validate configuration
       run: |
@@ -147,6 +163,15 @@ jobs:
           echo "Running with default categories from config"
           python -m autosumm.cli run --config config.yaml
         fi
+
+    - name: Cache MinerU model weights
+      if: steps.extract_config.outputs.use_mineru == 'true'
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/
+        key: mineru-cache-v1-${{ hashFiles('config.yaml') || 'no-config' }}
+        restore-keys: |
+          mineru-cache-v1-
 
     - name: Upload outputs as artifacts
       uses: actions/upload-artifact@v4
