@@ -3,9 +3,9 @@ PDF parsing functionalities with fast and high-quality modes.
 """
 
 import os
-import subprocess
-import shutil
 import time
+import zipfile
+import io
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 from pathlib import Path
@@ -15,9 +15,9 @@ import logging
 import requests
 
 try:
-    from client import BaseClient, BatchConfig
+    from client import BaseClient, BatchConfig, UsageInfo
 except:
-    from .client import BaseClient, BatchConfig
+    from .client import BaseClient, BatchConfig, UsageInfo
 
 logger = logging.getLogger(__name__)
 
@@ -40,14 +40,13 @@ class MistralOCRConfig:
 
 @dataclass
 class MinerUConfig:
-    method: str = "auto"
-    backend: str = "pipeline"
-    url: Optional[str] = None
-    device: str = "cpu"
-    formula: bool = True
-    table: bool = True
-    vram: Optional[int] = None
-    source: str = "huggingface"
+    api_token: str
+    is_ocr: bool = False
+    enable_formula: bool = True
+    enable_table: bool = True
+    model_version: str = "pipeline"
+    poll_interval: int = 10
+    max_poll_time: int = 300
 
 @dataclass
 class ParserConfig:
@@ -262,391 +261,205 @@ def parse_vlm(cache_paths: List[str], config: ParserConfig, batch_config: Option
 
     return results
 
-def parse_mineru(cache_paths: List[str], config: ParserConfig, batch_config: Optional[BatchConfig]=None) -> List[ParseResult]:
-    """
-    Main interface function for MinerU parsing of multiple PDFs.
+def _ocr_pdf(cache_path: str, config: ParserConfig):
+    with open(cache_path, 'rb') as f:
+        pdf_base64 = base64.b64encode(f.read()).decode('utf-8')
 
-    Orchestrates the complete workflow:
-    1. Create temporary output directories for each PDF
-    2. Execute MinerU CLI with subprocess
-    3. Read generated markdown content
-    4. Clean up temporary files
-    5. Return ParseResults with markdown content
-    """
-    if not config.mineru:
-        logger.error("MinerU configuration is missing")
-        return [
-            ParseResult(
-                content="",
-                success=False,
-                error="MinerU configuration is missing",
-                method="mineru"
-            ) for _ in cache_paths
-        ]
+    payload = {
+        "model": config.mistral.model,
+        "document": {
+            "type": "document_url",
+            "document_url": f"data:application/pdf;base64,{pdf_base64}"
+        },
+        "include_image_base64": True
+    }
 
-    results = []
+    response = requests.post(
+        "https://api.mistral.ai/v1/ocr",
+        headers={"Authorization": f"Bearer {config.mistral.api_key}"},
+        json=payload,
+        timeout=300
+    )
 
-    for pdf_index, cache_path in enumerate(cache_paths):
-        logger.info(f"Processing PDF {pdf_index+1}/{len(cache_paths)} with MinerU: {cache_path}")
+    response.raise_for_status()  # Raise HTTP errors
+    return response.json()
 
-        # Create temporary output directory
-        temp_dir = None
-        try:
-            temp_dir = Path(batch_config.tmp_dir) / f"mineru_temp_{pdf_index}_{int(time.time())}"
-            temp_dir.mkdir(parents=True, exist_ok=True)
+def _validate_mistral_response(response_data):
+    """Validate Mistral OCR API response structure"""
+    if not isinstance(response_data, dict):
+        raise ValueError("Invalid API response: expected JSON object")
 
-            # Validate PDF file exists
-            if not os.path.exists(cache_path):
-                logger.error(f"PDF file not found: {cache_path}")
-                results.append(ParseResult(
-                    content="",
-                    success=False,
-                    error=f"PDF file not found: {cache_path}",
-                    method="mineru"
-                ))
-                continue
+    if "pages" not in response_data:
+        raise ValueError("Invalid API response: missing 'pages' field")
 
-            # Build MinerU CLI command
-            cmd = [
-                "mineru",
-                "-p", cache_path,
-                "-o", str(temp_dir),
-                "-m", config.mineru.method,
-                "-b", config.mineru.backend,
-                "--lang", "en",  # Hardcoded for arXiv papers
-                "--formula", str(config.mineru.formula).lower(),
-                "--table", str(config.mineru.table).lower(),
-                "--device", config.mineru.device,
-                "--source", config.mineru.source
-            ]
+    if not isinstance(response_data["pages"], list):
+        raise ValueError("Invalid API response: 'pages' must be a list")
 
-            # Add optional URL if specified (for http-client backend)
-            if config.mineru.url:
-                cmd.extend(["--url", config.mineru.url])
+    return response_data
 
-            # Add optional VRAM limit if specified
-            if config.mineru.vram:
-                cmd.extend(["--vram", str(config.mineru.vram)])
+def _construct_markdown_mistral(ocr_result: str):
+    validated_result = _validate_mistral_response(ocr_result)
 
-            logger.info(f"Executing MinerU CLI: {' '.join(cmd)}")
-
-            # Execute MinerU CLI
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=1800  # 30 minutes timeout for large PDFs
-            )
-
-            if result.returncode != 0:
-                error_msg = f"MinerU CLI failed with return code {result.returncode}: {result.stderr}"
-                logger.error(error_msg)
-                results.append(ParseResult(
-                    content="",
-                    success=False,
-                    error=error_msg,
-                    method="mineru"
-                ))
-                continue
-
-            # Look for generated markdown file
-            pdf_name = Path(cache_path).stem
-            # MinerU creates nested structure: temp_dir/pdf_name/method/pdf_name.md
-            md_file = temp_dir / pdf_name / config.mineru.method / f"{pdf_name}.md"
-
-            if not md_file.exists():
-                error_msg = f"MinerU did not generate expected markdown file: {md_file}"
-                logger.error(error_msg)
-                results.append(ParseResult(
-                    content="",
-                    success=False,
-                    error=error_msg,
-                    method="mineru"
-                ))
-                continue
-
-            # Read markdown content
-            with open(md_file, 'r', encoding='utf-8') as f:
-                content = f.read().strip()
-
-            if not content:
-                error_msg = f"Generated markdown file is empty: {md_file}"
-                logger.error(error_msg)
-                results.append(ParseResult(
-                    content="",
-                    success=False,
-                    error=error_msg,
-                    method="mineru"
-                ))
-                continue
-
-            logger.info(f"Successfully processed PDF {pdf_index+1} with MinerU, content length: {len(content)}")
-            results.append(ParseResult(
-                content=content,
-                success=True,
-                error="",
-                method="mineru"
-            ))
-
-        except subprocess.TimeoutExpired:
-            error_msg = f"MinerU processing timed out for PDF {pdf_index+1} after 30 minutes"
-            logger.error(error_msg)
-            results.append(ParseResult(
-                content="",
-                success=False,
-                error=error_msg,
-                method="mineru"
-            ))
-        except Exception as e:
-            error_msg = f"Error processing PDF {pdf_index+1} with MinerU: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            results.append(ParseResult(
-                content="",
-                success=False,
-                error=error_msg,
-                method="mineru"
-            ))
-        finally:
-            # Clean up temporary directory
-            if temp_dir and temp_dir.exists():
-                try:
-                    shutil.rmtree(temp_dir)
-                    logger.debug(f"Cleaned up temporary directory: {temp_dir}")
-                except Exception as e:
-                    logger.warning(f"Failed to clean up temporary directory {temp_dir}: {e}")
-
-    logger.info(f"MinerU parsing completed: {len([r for r in results if r.success])} successful, {len([r for r in results if not r.success])} failed")
-    return results
+    markdown_content = "\n\n".join([
+        page["markdown"]
+        for page in validated_result["pages"] if page["markdown"].strip()
+    ])
+    return markdown_content
 
 def parse_mistral(cache_paths: List[str], config: ParserConfig, batch_config: Optional[BatchConfig]=None) -> List[ParseResult]:
     """
-    Main interface function for Mistral-OCR parsing of multiple PDFs.
+    Parse PDFs using Mistral OCR API.
 
-    Orchestrates the complete workflow:
-    1. Direct PDF processing via Mistral OCR API
-    2. Response parsing and content extraction
-    3. Result reconstruction (OCR results -> ParseResults)
+    Data flow:
+    1. Read PDF → base64
+    2. POST /v1/ocr → get pages with markdown
+    3. Extract markdown from pages
     """
-    if not config.mistral:
-        logger.error("Mistral OCR configuration is missing")
-        return [
-            ParseResult(
-                content="",
-                success=False,
-                error="Mistral OCR configuration is missing",
-                method="mistral-ocr"
-            ) for _ in cache_paths
-        ]
 
     results = []
+    for cache_path in cache_paths:
+        ocr_result = _ocr_pdf(cache_path, config)
 
-    for pdf_index, cache_path in enumerate(cache_paths):
-        logger.info(f"Processing PDF {pdf_index+1}/{len(cache_paths)} with Mistral OCR: {cache_path}")
+        markdown_content = _construct_markdown_mistral(ocr_result)
 
-        try:
-            # Validate PDF file exists
-            if not os.path.exists(cache_path):
-                logger.error(f"PDF file not found: {cache_path}")
-                results.append(ParseResult(
-                    content="",
-                    success=False,
-                    error=f"PDF file not found: {cache_path}",
-                    method="mistral-ocr"
-                ))
-                continue
+        logger.debug(f"Successfully parsed {cache_path} with Mistral-OCR")
 
-            # Read and encode PDF
-            with open(cache_path, 'rb') as f:
-                pdf_base64 = base64.b64encode(f.read()).decode('utf-8')
+        results.append(ParseResult(
+            content=markdown_content,
+            success=bool(markdown_content),
+            error="" if markdown_content else "No markdown content found",
+            method="mistral-ocr"
+        ))
 
-            # Prepare Mistral OCR API request
-            api_url = "https://api.mistral.ai/v1/ocr"
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {config.mistral.api_key}"
-            }
-
-            payload = {
-                "model": config.mistral.model,
-                "document": {
-                    "type": "document_url",
-                    "document_url": f"data:application/pdf;base64,{pdf_base64}"
-                },
-                "include_image_base64": True
-            }
-
-            logger.info(f"Sending PDF {pdf_index+1} to Mistral OCR API")
-
-            # Make API request
-            response = requests.post(api_url, headers=headers, json=payload, timeout=300)
-
-            if response.status_code == 200:
-                ocr_result = response.json()
-
-                # Extract markdown content from all pages
-                if "pages" in ocr_result and ocr_result["pages"]:
-                    page_contents = []
-                    for page in ocr_result["pages"]:
-                        if "markdown" in page and page["markdown"].strip():
-                            page_contents.append(page["markdown"].strip())
-
-                    if page_contents:
-                        full_content = "\n\n".join(page_contents)
-                        logger.info(f"Successfully extracted {len(page_contents)} pages from PDF {pdf_index+1}")
-
-                        results.append(ParseResult(
-                            content=full_content,
-                            success=True,
-                            error="",
-                            method="mistral-ocr"
-                        ))
-                    else:
-                        logger.warning(f"No markdown content extracted from PDF {pdf_index+1}")
-                        results.append(ParseResult(
-                            content="",
-                            success=False,
-                            error="No markdown content extracted from OCR response",
-                            method="mistral-ocr"
-                        ))
-                else:
-                    logger.error(f"Invalid OCR response format for PDF {pdf_index+1}")
-                    results.append(ParseResult(
-                        content="",
-                        success=False,
-                        error="Invalid OCR response format: missing pages",
-                        method="mistral-ocr"
-                    ))
-            else:
-                error_msg = f"Mistral OCR API error: {response.status_code} - {response.text}"
-                logger.error(error_msg)
-                results.append(ParseResult(
-                    content="",
-                    success=False,
-                    error=error_msg,
-                    method="mistral-ocr"
-                ))
-
-        except requests.exceptions.Timeout:
-            error_msg = f"Timeout processing PDF {pdf_index+1} with Mistral OCR"
-            logger.error(error_msg)
-            results.append(ParseResult(
-                content="",
-                success=False,
-                error=error_msg,
-                method="mistral-ocr"
-            ))
-        except Exception as e:
-            error_msg = f"Error processing PDF {pdf_index+1} with Mistral OCR: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            results.append(ParseResult(
-                content="",
-                success=False,
-                error=error_msg,
-                method="mistral-ocr"
-            ))
-
-    logger.info(f"Mistral OCR parsing completed: {len([r for r in results if r.success])} successful, {len([r for r in results if not r.success])} failed")
     return results
 
+def _request_upload_urls(cache_paths: List[str], config: ParserConfig):
+    payload = {
+        "enable_formula": config.mineru.enable_formula,
+        "enable_table": config.mineru.enable_table,
+        "language": "en",
+        "model_version": config.mineru.model_version,
+        "files": [
+            {"name": Path(p).name, "is_ocr": config.mineru.is_ocr, "data_id": f"arxiv_{i}_{int(time.time())}"}
+            for i, p in enumerate(cache_paths)
+        ]
+    }
 
-if __name__ == "__main__":
-    def save_parse_result(result: ParseResult, output_path: str):
-        """Save ParseResult to a markdown file"""
-        try:
-            with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(f"# Parse Result\n\n")
-                f.write(f"**Method:** {result.method}\n")
-                f.write(f"**Success:** {result.success}\n")
-                if result.error:
-                    f.write(f"**Error:** {result.error}\n")
-                f.write(f"\n---\n\n")
-                f.write(result.content)
-            print(f"Parse result saved to: {output_path}")
-        except Exception as e:
-            print(f"Error saving parse result: {e}")
-            
-    # Test Mistral OCR
-    mistral_config = MistralOCRConfig(
-        model="mistral-ocr-latest",
-        api_key=os.getenv("MISTRAL_API_KEY", "")
+    response = requests.post(
+        "https://mineru.net/api/v4/file-urls/batch",
+        headers={"Authorization": f"Bearer {config.mineru.api_token}"},
+        json=payload
     )
 
-    config = ParserConfig(
-        method="mistral-ocr",
-        tmp_dir="./tmp",
-        vlm=None,
-        mistral=mistral_config,
-        mineru=None
-    )
+    data = response.json()
+    return data["data"]["batch_id"], data["data"]["file_urls"]
 
-    batch_config = BatchConfig(
-        tmp_dir="./tmp",
-        max_wait_hours=24,
-        poll_interval_seconds=30,
-        fallback_on_error=True
-    )
+def _upload_files(cache_paths: List[str], upload_urls: List[str]):
+    for cache_path, upload_url in zip(cache_paths, upload_urls):
+        with open(cache_path, 'rb') as f:
+            requests.put(upload_url, data=f)
 
-    # Test with a sample PDF - replace with an actual PDF path you have
-    cache_path = "/home/whititera/Developments/arxiv-autosumm/test.pdf"  # Replace with actual PDF path
+def _poll_results(config: ParserConfig, batch_id):
+    start_time = time.time()
+    while time.time() - start_time < config.mineru.max_poll_time:
+        response = requests.get(
+            f"https://mineru.net/api/v4/extract-results/batch/{batch_id}",
+            headers={"Authorization": f"Bearer {config.mineru.api_token}"}
+        )
 
-    """print("Testing Mistral OCR parsing...")
-    if os.path.exists(cache_path):
-        result = parse_mistral([cache_path], config, batch_config)[0]
+        response.raise_for_status()  # Raise HTTP errors
+        results = response.json()["data"]["extract_result"]
+        if all(r["state"] in ["done", "failed"] for r in results):
+            return results
 
-        print(f"Mistral OCR parsing success: {result.success}")
-        if result.error:
-            print(f"Error: {result.error}")
+        time.sleep(config.mineru.poll_interval)
 
-        # Save result to markdown file
-        output_path = "mistral_ocr_result.md"
-        save_parse_result(result, output_path)
+    raise TimeoutError(f"MinerU processing timeout after {config.mineru.max_poll_time} seconds")
 
-        # Print first 500 characters of content
-        if result.content:
-            print(f"Content preview:\n{result.content[:500]}...")
-    else:
-        print(f"PDF file not found: {cache_path}")
-        print("Please update cache_path with a valid PDF file path to test Mistral OCR")
+def _construct_markdown_mineru(zip_url):
+    """Construct markdown from MinerU content_list.json with proper heading levels"""
+    import json
+    import re
 
-    print("\n" + "="*50)
-    print("Testing MinerU parsing...")"""
+    response = requests.get(zip_url)
+    with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+        # Find content_list.json file
+        content_files = [f for f in zf.namelist() if f.endswith('_content_list.json')]
+        if not content_files:
+            # Fallback to full.md if content_list.json not found
+            return zf.read("full.md").decode('utf-8')
 
-    # Test MinerU
-    mineru_config = MinerUConfig(
-        backend="pipeline",
-        method="auto",
-        device="cpu",
-        formula=True,
-        table=True,
-        source="huggingface"
-    )
+        content_file = content_files[0]
+        content_data = json.loads(zf.read(content_file).decode('utf-8'))
 
-    config_mineru = ParserConfig(
-        method="mineru",
-        tmp_dir="./tmp",
-        vlm=None,
-        mistral=None,
-        mineru=mineru_config
-    )
+    markdown_lines = []
 
-    # Test with a sample PDF - replace with an actual PDF path you have
-    cache_path_mineru = "/home/whititera/Developments/arxiv-autosumm/test.pdf"  # Replace with actual PDF path
+    for item in content_data:
+        if item["type"] == "text":
+            text = item["text"].strip()
 
-    print("Testing MinerU parsing...")
-    if os.path.exists(cache_path_mineru):
-        result_mineru = parse_mineru([cache_path_mineru], config_mineru, batch_config)[0]
+            # Handle headings based on text_level and text content
+            if "text_level" in item and item["text_level"] == 1:
+                # Count dots in heading text to determine markdown level
+                dot_count = text.count('.')
 
-        print(f"MinerU parsing success: {result_mineru.success}")
-        if result_mineru.error:
-            print(f"Error: {result_mineru.error}")
+                # Special cases for appendix sections like "D.2"
+                if re.match(r'^[A-Z]\.\d+', text):
+                    dot_count = text.count('.') + 1
 
-        # Save result to markdown file
-        output_path_mineru = "mineru_result.md"
-        save_parse_result(result_mineru, output_path_mineru)
+                # Determine markdown heading level (1-6)
+                # No dots = level 1, 1 dot = level 2, etc.
+                heading_level = min(dot_count + 1, 6)
+                markdown_lines.append(f"{'#' * heading_level} {text}")
+            else:
+                # Regular text
+                markdown_lines.append(text)
 
-        # Print first 500 characters of content
-        if result_mineru.content:
-            print(f"Content preview:\n{result_mineru.content[:500]}...")
-    else:
-        print(f"PDF file not found: {cache_path_mineru}")
-        print("Please update cache_path_mineru with a valid PDF file path to test MinerU")
+        elif item["type"] == "image":
+            # Handle images - for now just include captions
+            # Future: Add image captioner integration here
+            if "image_caption" in item and item["image_caption"]:
+                caption_text = " ".join(item["image_caption"])
+                markdown_lines.append(f"\n![Image]({item['img_path']})\n\n{caption_text}\n")
+
+    return "\n\n".join(markdown_lines)
+
+def parse_mineru(cache_paths: List[str], config: ParserConfig, batch_config: Optional[BatchConfig]=None) -> List[ParseResult]:
+    """
+    Parse PDFs using MinerU API batch upload.
+
+    Data flow:
+    1. POST /file-urls/batch → get batch_id, upload_urls
+    2. PUT files to upload_urls
+    3. GET /extract-results/batch/{batch_id} → get extract_results
+    4. Download ZIPs, construct markdown
+    """
+
+    # Execute workflow
+    batch_id, upload_urls = _request_upload_urls(cache_paths, config)
+    _upload_files(cache_paths, upload_urls)
+    results = _poll_results(config, batch_id)
+
+    # Build ParseResults
+    parse_results = []
+    for cache_path in cache_paths:
+        filename = Path(cache_path).name
+
+        result = next((r for r in results if r["file_name"] == filename), None)
+        if not result:
+            parse_results.append(ParseResult("", False, "File not found in results", "mineru"))
+            continue
+
+        if result["state"] == "failed":
+            parse_results.append(ParseResult("", False, result["err_msg"], "mineru"))
+        else:
+            # Construct markdown content
+            content = _construct_markdown_mineru(result["full_zip_url"])
+
+            logger.debug(f"Successfully parsed {cache_path} with MinerU")
+
+            parse_results.append(ParseResult(content, True, "", "mineru"))
+
+    return parse_results
+
+

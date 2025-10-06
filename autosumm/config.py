@@ -497,56 +497,40 @@ class MistralOCRConfig(BaseModel):
         )
     
 class MinerUConfig(BaseModel):
-    method: str = "auto"
-    backend: str = "pipeline"
-    url: Optional[str] = None
-    device: str = "cpu"
-    formula: bool = True
-    table: bool = True
-    vram: Optional[int] = None
-    source: str = "huggingface"
+    api_token: str
+    is_ocr: bool = False
+    enable_formula: bool = True
+    enable_table: bool = True
+    model_version: str = "pipeline"
+    poll_interval: int = 10
+    max_poll_time: int = 300
 
-    @field_validator('method')
+    @field_validator('model_version')
     @classmethod
-    def validate_method(cls, v: str) -> str:
-        if v not in ["auto", "txt", "ocr"]:
-            return "auto"
-        return v
-
-    @field_validator('backend')
-    @classmethod
-    def validate_backend(cls, v: str) -> str:
-        valid_backends = ["pipeline", "vlm-transformers", "vlm-vllm-engine", "vlm-http-client"]
-        if v not in valid_backends:
+    def validate_model_version(cls, v: str) -> str:
+        if v not in ["pipeline", "vlm"]:
             return "pipeline"
         return v
 
-    @field_validator('device')
+    @field_validator('poll_interval')
     @classmethod
-    def validate_device(cls, v: str) -> str:
-        # Basic validation for device strings
-        if not v or not isinstance(v, str):
-            return "cpu"
-        return v
+    def validate_poll_interval(cls, v: int) -> int:
+        return max(5,v)
 
-    @field_validator('source')
+    @field_validator('max_poll_time')
     @classmethod
-    def validate_source(cls, v: str) -> str:
-        valid_sources = ["huggingface", "modelscope", "local"]
-        if v not in valid_sources:
-            return "huggingface"
-        return v
+    def validate_max_poll_time(cls, v: int) -> int:
+        return max(60,v)
 
     def to_pipeline_config(self):
         return MinerUConfig_(
-            method=self.method,
-            backend=self.backend,
-            url=self.url,
-            device=self.device,
-            formula=self.formula,
-            table=self.table,
-            vram=self.vram,
-            source=self.source
+            api_token=self.api_token,
+            is_ocr=self.is_ocr,
+            enable_formula=self.enable_formula,
+            enable_table=self.enable_table,
+            model_version=self.model_version,
+            poll_interval=self.poll_interval,
+            max_poll_time=self.max_poll_time
         )
 
 class ParserConfig(BaseModel):
@@ -563,8 +547,8 @@ class ParserConfig(BaseModel):
     @classmethod
     def validate_vlm_required(cls, v: Optional[ParserVLMConfig], info):
         method = info.data.get('method', 'text-extraction')
-        if method == 'mineru' and v is None:
-            raise ValueError("VLM configuration is required when enable_vlm is True. Please add the vlm section with provider, model, and API configuration under parse: in your config.yaml")
+        if method == 'vlm' and v is None:
+            raise ValueError("VLM configuration is required when method is 'vlm'. Please add the vlm section with provider, model, and API configuration under parse: in your config.yaml")
         return v
 
     @field_validator('mistral')

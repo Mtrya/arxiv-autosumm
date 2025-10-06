@@ -136,7 +136,7 @@ def _extract_from_cached_file(cache_path: Path, pdf_url: str, index: int) -> Fet
 
         content = _extract_text_from_bytes(pdf_bytes)
 
-        logger.info(f"Successfully extracted text from cached PDF {index+1} ({pdf_url})")
+        logger.debug(f"Successfully extracted text from cached PDF {index+1} ({pdf_url})")
 
         return FetchResult(
             title="", pdf_url=pdf_url, authors=[], entry_id="", arxiv_id="",
@@ -160,7 +160,7 @@ def _extract_from_cached_file(cache_path: Path, pdf_url: str, index: int) -> Fet
 
 def _download_extract_and_cache(pdf_url: str, cache_path: Path, config: FetcherConfig, index: int) -> FetchResult:
     """Download PDF, extract text in-memory, then save to cache."""
-    logger.info(f"Downloading PDF {index+1}: {pdf_url}")
+    logger.debug(f"Downloading PDF {index+1}: {pdf_url}")
 
     downloaded_successfully = False
     pdf_bytes = None
@@ -192,7 +192,7 @@ def _download_extract_and_cache(pdf_url: str, cache_path: Path, config: FetcherC
     # Extract text from downloaded bytes (optimal: no disk I/O yet)
     try:
         content = _extract_text_from_bytes(pdf_bytes)
-        logger.info(f"Successfully extracted text from downloaded PDF {index+1} ({pdf_url})")
+        logger.debug(f"Successfully extracted text from downloaded PDF {index+1} ({pdf_url})")
 
         # Validate and save to cache after successful text extraction
         if pdf_bytes.startswith(b'%PDF-'):
@@ -302,7 +302,7 @@ def fetch_pdf(pdf_urls: List[str], cache_dir: str, config: FetcherConfig) -> Lis
     Download PDFs and extract text in parallel.
     Results are returned in the same order as the input pdf_urls.
     """
-    logger.info(f"Starting download & text extraction for {len(pdf_urls)} PDFs using multithreading")
+    logger.debug(f"Starting download & text extraction for {len(pdf_urls)} PDFs using multithreading")
 
     os.makedirs(cache_dir, exist_ok=True)
     results = [None] * len(pdf_urls)

@@ -33,7 +33,6 @@ dependencies = [
     "typer>=0.12.3",
     "pymarkdownlnt>=0.9.31",
     "pdfminer-six>=20250506",
-    "mineru[core]>=2.5.4",
 ]
 
 [project.scripts]
@@ -41,10 +40,6 @@ autosumm = "autosumm.cli:app"
 
 [tool.setuptools]
 packages = ["autosumm"]
-
-[[tool.uv.index]]
-url = "https://mirrors.aliyun.com/pypi/simple/"
-default = true
 
 [dependency-groups]
 dev = [

@@ -76,12 +76,14 @@ parse:
       temperature: 0.3
       max_tokens: 4096
     dpi: 200
-  mistral:
-    model: mistral-ocr-latest
-    api_key: env:MISTRAL_API_KEY
   mineru:
-    backend: pipeline
-    method: auto
+    api_token: env:MINERU_API_TOKEN
+    is_ocr: true
+    enable_formula: true
+    enable_table: true
+    model_version: pipeline
+    poll_interval: 10
+    max_poll_time: 300
 
 render:
   formats:

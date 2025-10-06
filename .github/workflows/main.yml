@@ -105,6 +105,7 @@ jobs:
         echo "✅ Group B secrets export completed"
 
         # Export Custom Secrets (manually added)
+        echo "MINERU_API_TOKEN=${{ secrets.MINERU_API_TOKEN }}" >> $GITHUB_ENV
         echo "✅ Custom secrets export completed"
 
         echo "✅ Repository variables and secrets export completed"
@@ -163,15 +164,6 @@ jobs:
           echo "Running with default categories from config"
           python -m autosumm.cli run --config config.yaml
         fi
-
-    - name: Cache MinerU model weights
-      if: steps.extract_config.outputs.use_mineru == 'true'
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/
-        key: mineru-cache-v1-${{ hashFiles('config.yaml') || 'no-config' }}
-        restore-keys: |
-          mineru-cache-v1-
 
     - name: Upload outputs as artifacts
       uses: actions/upload-artifact@v4
