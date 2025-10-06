@@ -578,6 +578,7 @@ class ParserConfig(BaseModel):
             raise ValueError("VLM configuration is required when mistral.caption_images=True. Please add the vlm section with provider, model, and API configuration under parse: in your config.yaml")
         if self.method == 'mineru' and self.mineru and self.mineru.caption_images and not self.vlm:
             raise ValueError("VLM configuration is required when mineru.caption_images=True. Please add the vlm section with provider, model, and API configuration under parse: in your config.yaml")
+        return self
 
     def to_pipeline_config(self):
         return ParserConfig_(

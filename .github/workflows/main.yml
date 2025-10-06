@@ -223,5 +223,28 @@ jobs:
         done
 
         echo "✅ Cleanup completed"
+
+    - name: Clean up old caches
+      if: github.event_name == 'schedule'
+      run: |
+        echo "🧹 Cleaning up old caches..."
+
+        # List all caches and delete old ones, keeping only the latest
+        gh cache list --limit 100 | grep "arxiv-cache-v4" | tail -n +2 | cut -f1 | while read cache_id; do
+          if [ -n "$cache_id" ]; then
+            echo "Deleting cache: $cache_id"
+            gh cache delete "$cache_id" 2>/dev/null || echo "Failed to delete cache $cache_id"
+          fi
+        done
+
+        # Clean up old pip caches too, keeping only the latest
+        gh cache list --limit 100 | grep "${{ runner.os }}-pip-" | tail -n +2 | cut -f1 | while read cache_id; do
+          if [ -n "$cache_id" ]; then
+            echo "Deleting pip cache: $cache_id"
+            gh cache delete "$cache_id" 2>/dev/null || echo "Failed to delete pip cache $cache_id"
+          fi
+        done
+
+        echo "✅ Cache cleanup completed"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
