@@ -473,7 +473,7 @@ def _construct_markdown_mineru(zip_url, config: ParserConfig):
                 # Process image item
                 if vlm_client:
                     try:
-                        image_data = zf.read(f"{dir_prefix}/{item["img_path"]}")
+                        image_data = zf.read(f"{dir_prefix}/{item['img_path']}")
                         image_base64 = f"data:image/jpg;base64,{base64.b64encode(image_data).decode('utf-8')}"
                         vlm_caption, usage_info = vlm_client.process_single(image_base64, return_usage=True)
                         if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):
