@@ -17,8 +17,8 @@ summarize:
   base_url: null
   model: env:SMART_MODEL
   batch: false
-  system_prompt: file:./prompts/summ_lm/system.md
-  user_prompt_template: file:./prompts/summ_lm/user.md
+  system_prompt: file:./prompts/summ_lm/system.txt
+  user_prompt_template: file:./prompts/summ_lm/user.txt
   completion_options:
     temperature: 1.0
   context_length: 200000
@@ -32,8 +32,8 @@ rate:
     base_url: null
     model: env:FAST_MODEL
     batch: false
-    system_prompt: file:./prompts/rate_lm/system.md
-    user_prompt_template: file:./prompts/rate_lm/user.md
+    system_prompt: file:./prompts/rate_lm/system.txt
+    user_prompt_template: file:./prompts/rate_lm/user.txt
     completion_options:
       temperature: 0.2
       max_tokens: 2048
@@ -70,11 +70,11 @@ parse:
     base_url: null
     model: env:VISION_MODEL
     batch: false
-    system_prompt: file:./prompts/parse_vlm/system.md
-    user_prompt: file:./prompts/parse_vlm/user.md
+    system_prompt: file:./prompts/caption_vlm/system.txt
+    user_prompt: file:./prompts/caption_vlm/user.txt
     completion_options:
       temperature: 0.3
-      max_tokens: 4096
+      max_tokens: 256
     dpi: 200
   mineru:
     api_token: env:MINERU_API_TOKEN
@@ -84,6 +84,7 @@ parse:
     model_version: pipeline
     poll_interval: 10
     max_poll_time: 300
+    caption_images: true
 
 render:
   formats:
