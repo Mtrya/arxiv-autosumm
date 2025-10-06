@@ -11,6 +11,8 @@ from .pipeline import (
     FetcherConfig as FetcherConfig_,
     ParserConfig as ParserConfig_,
     ParserVLMConfig as ParserVLMConfig_,
+    MistralOCRConfig as MistralOCRConfig_,
+    MinerUConfig as MinerUConfig_,
     RaterConfig as RaterConfig_,
     RaterEmbedderConfig as RaterEmbedderConfig_,
     RaterLLMConfig as RaterLLMConfig_,
@@ -66,6 +68,9 @@ recognized_providers = {
     },
     "minimax": {
         "base_url": "https://api.minimax.chat/v1"
+    },
+    "mistral": {
+        "base_url": "https://api.mistral.ai/v1"
     },
     "modelscope": {
         "base_url": "https://api-inference.modelscope.cn/v1"
@@ -481,25 +486,110 @@ class ParserVLMConfig(BaseModel):
             dpi=self.dpi
         )
 
+class MistralOCRConfig(BaseModel):
+    api_key: str
+    model: str="mistral-ocr-latest"
+
+    def to_pipeline_config(self):
+        return MistralOCRConfig_(
+            api_key=self.api_key,
+            model=self.model
+        )
+    
+class MinerUConfig(BaseModel):
+    method: str = "auto"
+    backend: str = "pipeline"
+    url: Optional[str] = None
+    device: str = "cpu"
+    formula: bool = True
+    table: bool = True
+    vram: Optional[int] = None
+    source: str = "huggingface"
+
+    @field_validator('method')
+    @classmethod
+    def validate_method(cls, v: str) -> str:
+        if v not in ["auto", "txt", "ocr"]:
+            return "auto"
+        return v
+
+    @field_validator('backend')
+    @classmethod
+    def validate_backend(cls, v: str) -> str:
+        valid_backends = ["pipeline", "vlm-transformers", "vlm-vllm-engine", "vlm-http-client"]
+        if v not in valid_backends:
+            return "pipeline"
+        return v
+
+    @field_validator('device')
+    @classmethod
+    def validate_device(cls, v: str) -> str:
+        # Basic validation for device strings
+        if not v or not isinstance(v, str):
+            return "cpu"
+        return v
+
+    @field_validator('source')
+    @classmethod
+    def validate_source(cls, v: str) -> str:
+        valid_sources = ["huggingface", "modelscope", "local"]
+        if v not in valid_sources:
+            return "huggingface"
+        return v
+
+    def to_pipeline_config(self):
+        return MinerUConfig_(
+            method=self.method,
+            backend=self.backend,
+            url=self.url,
+            device=self.device,
+            formula=self.formula,
+            table=self.table,
+            vram=self.vram,
+            source=self.source
+        )
+
 class ParserConfig(BaseModel):
     method: Optional[str]="text-extraction"
     tmp_dir: Optional[str]="./tmp"
     vlm: Optional[ParserVLMConfig]=None
     """If method is 'vlm', then ParserVLMConfig is not required"""
+    mistral: Optional[MistralOCRConfig]=None
+    """If method is 'mistral-ocr', then MistralOCRConfig is required"""
+    mineru: Optional[MinerUConfig]=None
+    """If method is 'mineru', then MinerUConfig is required"""
 
     @field_validator('vlm')
     @classmethod
     def validate_vlm_required(cls, v: Optional[ParserVLMConfig], info):
-        enable_vlm = info.data.get('enable_vlm', False)
-        if enable_vlm and v is None:
+        method = info.data.get('method', 'text-extraction')
+        if method == 'mineru' and v is None:
             raise ValueError("VLM configuration is required when enable_vlm is True. Please add the vlm section with provider, model, and API configuration under parse: in your config.yaml")
+        return v
+
+    @field_validator('mistral')
+    @classmethod
+    def validate_mistral_required(cls, v: Optional[MistralOCRConfig], info):
+        method = info.data.get('method', 'text-extraction')
+        if method == 'mistral-ocr' and v is None:
+            raise ValueError("Mistral OCR configuration is required when method is 'mistral-ocr'. Please add the mistral section with model and API configuration under parse: in your config.yaml")
+        return v
+
+    @field_validator('mineru')
+    @classmethod
+    def validate_mineru_required(cls, v: Optional[MinerUConfig], info):
+        method = info.data.get('method', 'text-extraction')
+        if method == 'mineru' and v is None:
+            raise ValueError("MinerU configuration is required when method is 'mineru'. Please add the mineru section with backend configuration under parse: in your config.yaml")
         return v
     
     def to_pipeline_config(self):
         return ParserConfig_(
             method=self.method,
             tmp_dir=self.tmp_dir,
-            vlm=self.vlm.to_pipeline_config() if self.vlm else None
+            vlm=self.vlm.to_pipeline_config() if self.vlm else None,
+            mistral=self.mistral.to_pipeline_config() if self.mistral else None,
+            mineru=self.mineru.to_pipeline_config() if self.mineru else None
         )
 
 class BatchConfig(BaseModel):

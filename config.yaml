@@ -76,6 +76,12 @@ parse:
       temperature: 0.3
       max_tokens: 4096
     dpi: 200
+  mistral:
+    model: mistral-ocr-latest
+    api_key: env:MISTRAL_API_KEY
+  mineru:
+    backend: pipeline
+    method: auto
 
 render:
   formats:

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from .pipeline import (
     Cacher, fetch_metadata, fetch_pdf,
-    parse_vlm, parse_mineru,
+    parse_vlm, parse_mistral, parse_mineru,
     rate_embed, rate_llm,
     summarize, render, deliver
 )
@@ -115,6 +115,8 @@ def parse_papers(papers: List[PaperMetadata], parse_config, batch_config=None, v
             return papers # return directly, because we already have simple text extraction result in fetch_pdf
         elif parse_config.method == "vlm":
             parse_results = parse_vlm(cache_paths, parse_config, batch_config)
+        elif parse_config.method == "mistral-ocr":
+            parse_results = parse_mistral(cache_paths, parse_config, batch_config)
         elif parse_config.method == "mineru":
             parse_results = parse_mineru(cache_paths, parse_config, batch_config)
         else:
