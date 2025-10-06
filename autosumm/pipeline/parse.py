@@ -366,7 +366,7 @@ def parse_mistral(cache_paths: List[str], config: ParserConfig) -> List[ParseRes
     for cache_path in cache_paths:
         ocr_result = _ocr_pdf(cache_path, config)
 
-        markdown_content = _construct_markdown_mistral(ocr_result)
+        markdown_content = _construct_markdown_mistral(ocr_result, config)
 
         logger.info(f"Successfully parsed {cache_path} with Mistral-OCR")
 
@@ -531,7 +531,7 @@ def parse_mineru(cache_paths: List[str], config: ParserConfig) -> List[ParseResu
             parse_results.append(ParseResult("", False, result["err_msg"], "mineru"))
         else:
             # Construct markdown content
-            content = _construct_markdown_mineru(result["full_zip_url"])
+            content = _construct_markdown_mineru(result["full_zip_url"], config)
 
             logger.info(f"Successfully parsed {cache_path} with MinerU")
 
