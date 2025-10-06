@@ -489,21 +489,24 @@ class ParserVLMConfig(BaseModel):
 class MistralOCRConfig(BaseModel):
     api_key: str
     model: str="mistral-ocr-latest"
+    caption_images: bool=False
 
     def to_pipeline_config(self):
         return MistralOCRConfig_(
             api_key=self.api_key,
-            model=self.model
+            model=self.model,
+            caption_images=self.caption_images
         )
     
 class MinerUConfig(BaseModel):
     api_token: str
-    is_ocr: bool = False
-    enable_formula: bool = True
-    enable_table: bool = True
-    model_version: str = "pipeline"
-    poll_interval: int = 10
-    max_poll_time: int = 300
+    is_ocr: bool=False
+    enable_formula: bool=True
+    enable_table: bool=True
+    model_version: str="pipeline"
+    poll_interval: int=10
+    max_poll_time: int=300
+    caption_images: bool=False
 
     @field_validator('model_version')
     @classmethod
@@ -530,14 +533,15 @@ class MinerUConfig(BaseModel):
             enable_table=self.enable_table,
             model_version=self.model_version,
             poll_interval=self.poll_interval,
-            max_poll_time=self.max_poll_time
+            max_poll_time=self.max_poll_time,
+            caption_images=self.caption_images
         )
 
 class ParserConfig(BaseModel):
     method: Optional[str]="text-extraction"
     tmp_dir: Optional[str]="./tmp"
     vlm: Optional[ParserVLMConfig]=None
-    """If method is 'vlm', then ParserVLMConfig is not required"""
+    """If method is 'vlm', then ParserVLMConfig is required"""
     mistral: Optional[MistralOCRConfig]=None
     """If method is 'mistral-ocr', then MistralOCRConfig is required"""
     mineru: Optional[MinerUConfig]=None
@@ -567,6 +571,14 @@ class ParserConfig(BaseModel):
             raise ValueError("MinerU configuration is required when method is 'mineru'. Please add the mineru section with backend configuration under parse: in your config.yaml")
         return v
     
+    @model_validator(mode='after')
+    def validate_vlm_required_by_captions(self):
+        """Validate that VLM config is available when caption_images is True"""
+        if self.method == 'mistral-ocr' and self.mistral and self.mistral.caption_images and not self.vlm:
+            raise ValueError("VLM configuration is required when mistral.caption_images=True. Please add the vlm section with provider, model, and API configuration under parse: in your config.yaml")
+        if self.method == 'mineru' and self.mineru and self.mineru.caption_images and not self.vlm:
+            raise ValueError("VLM configuration is required when mineru.caption_images=True. Please add the vlm section with provider, model, and API configuration under parse: in your config.yaml")
+
     def to_pipeline_config(self):
         return ParserConfig_(
             method=self.method,
@@ -762,12 +774,12 @@ class MainConfig(BaseModel):
     fetch: FetcherConfig
     summarize: SummarizerConfig
     rate: RaterConfig
-    parse: ParserConfig=ParserConfig()   
+    parse: ParserConfig
     batch: BatchConfig=BatchConfig()
     cache: CacherConfig=CacherConfig()
     render: RendererConfig
     deliver: DelivererConfig
-    """If parse, batch or cache is not provided or is None, go with default settings."""
+    """If batch or cache is not provided or is None, go with default settings."""
 
     @model_validator(mode="before")
     @classmethod

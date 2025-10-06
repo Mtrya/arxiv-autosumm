@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class BatchConfig:
-    tmp_dir: str
-    max_wait_hours: int
-    poll_interval_seconds: int
-    fallback_on_error: bool
+    tmp_dir: str = "./tmp"
+    max_wait_hours: int = 24
+    poll_interval_seconds: int = 30
+    fallback_on_error: bool = True
 
 @dataclass
 class UsageInfo:
@@ -464,7 +464,7 @@ class BaseClient(ABC):
             else:
                 return parsed_result
         except Exception as e:
-            logger.error(f"Failed to process input: {e}")
+            logger.error(f"Failed to process input: {e}",exc_info=True)
             if return_usage:
                 return None, None
             else:

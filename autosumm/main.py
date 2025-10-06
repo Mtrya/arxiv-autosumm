@@ -116,9 +116,9 @@ def parse_papers(papers: List[PaperMetadata], parse_config, batch_config=None, v
         elif parse_config.method == "vlm":
             parse_results = parse_vlm(cache_paths, parse_config, batch_config)
         elif parse_config.method == "mistral-ocr":
-            parse_results = parse_mistral(cache_paths, parse_config, batch_config)
+            parse_results = parse_mistral(cache_paths, parse_config)
         elif parse_config.method == "mineru":
-            parse_results = parse_mineru(cache_paths, parse_config, batch_config)
+            parse_results = parse_mineru(cache_paths, parse_config)
         else:
             logger.warning(f"Parse method '{parse_config.method}' not recognized, continue with 'text-extraction'.")
             return papers

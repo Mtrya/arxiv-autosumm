@@ -7,9 +7,11 @@ import time
 import zipfile
 import io
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from pathlib import Path
 import fitz
+import re
+import json
 import base64
 import logging
 import requests
@@ -37,6 +39,7 @@ class ParserVLMConfig:
 class MistralOCRConfig:
     api_key: str
     model: str = "mistral-ocr-latest"
+    caption_images: bool = False
 
 @dataclass
 class MinerUConfig:
@@ -47,6 +50,7 @@ class MinerUConfig:
     model_version: str = "pipeline"
     poll_interval: int = 10
     max_poll_time: int = 300
+    caption_images: bool = False
 
 @dataclass
 class ParserConfig:
@@ -117,7 +121,7 @@ def _cleanup_images(image_data_list: List[ImageData]):
         except OSError as e:
             logger.warning(f"Could not clean up image {image_data.image_path}: {e}", exc_info=True)
 
-def _reconstruct_results(vlm_results: List[Optional[str]], pdf_image_counts: List[int]) -> List[ParseResult]:
+def _construct_results_vlm(vlm_results: List[Optional[str]], pdf_image_counts: List[int]) -> List[ParseResult]:
     """Reconstruct VLM results back to ParseResults per PDF"""
     results = []
     result_index = 0
@@ -146,6 +150,8 @@ def _reconstruct_results(vlm_results: List[Optional[str]], pdf_image_counts: Lis
 
         page_contents = [result for result in pdf_vlm_results if result]
         full_content = "\n\n".join(page_contents)
+        # Remove inappropriate line breaks within paragraphs to form coherent sentences
+        full_content = re.sub(r'(?<!\n)\n(?!\n)', ' ', full_content)
 
         results.append(ParseResult(
             content=full_content,
@@ -160,10 +166,13 @@ class ParserVLMClient(BaseClient):
     def __init__(self, config: ParserVLMConfig, batch_config: Optional[BatchConfig]=None):
         super().__init__(config,batch_config)
 
-    def _build_payload(self, image_data: ImageData) -> dict:
+    def _build_payload(self, image_data: Union[ImageData,str]) -> dict:
         """Build VLM API payload for a single image"""
-        with open(image_data.image_path,'rb') as f:
-            image_base64 = base64.b64encode(f.read()).decode('utf-8')
+        if hasattr(image_data,"image_path"):
+            with open(image_data.image_path,'rb') as f:
+                image_base64 = f"data:image/png;base64,{base64.b64encode(f.read()).decode('utf-8')}"
+        else:
+            image_base64 = image_data
         
         messages = [{"role": "system", "content": self.config.system_prompt}]
         
@@ -171,7 +180,7 @@ class ParserVLMClient(BaseClient):
             "role": "user",
             "content": [
                 {"type": "text","text": self.config.user_prompt},
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}","detail": "high"}}
+                {"type": "image_url", "image_url": {"url": f"{image_base64}","detail": "high"}}
             ]
         })
 
@@ -247,14 +256,14 @@ def parse_vlm(cache_paths: List[str], config: ParserConfig, batch_config: Option
     else:
         vlm_results = []
         for image_data in all_image_data:
-            result, usage_info = vlm_client._process_single_with_usage(image_data, sleep_time=3)
+            result, usage_info = vlm_client.process_single(image_data, sleep_time=3, return_usage=True)
             if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):
                 logger.info(f"Converted image with {usage_info}")
             else:
                 logger.info(f"Converted image with {vlm_client.config.model} (usage info unavailable)")
             vlm_results.append(result)
     
-    results = _reconstruct_results(vlm_results, pdf_image_counts)
+    results = _construct_results_vlm(vlm_results, pdf_image_counts)
 
     _cleanup_images(all_image_data)
     logger.info(f"VLM parsing completed: {len([r for r in results if r.success])} successful, {len([r for r in results if not r.success])} failed")
@@ -297,16 +306,53 @@ def _validate_mistral_response(response_data):
 
     return response_data
 
-def _construct_markdown_mistral(ocr_result: str):
+def _construct_markdown_mistral(ocr_result: str, config: ParserConfig):
     validated_result = _validate_mistral_response(ocr_result)
 
-    markdown_content = "\n\n".join([
-        page["markdown"]
-        for page in validated_result["pages"] if page["markdown"].strip()
-    ])
+    vlm_client = None
+    img_counter = 1
+    if config.mistral.caption_images:
+        vlm_client = ParserVLMClient(config.vlm)
+
+    markdown_pages = []
+    
+    for page in validated_result["pages"]:
+        markdown_page = page["markdown"]
+
+        # Process images
+        for image in page["images"]:
+            if vlm_client:
+                try:
+                    vlm_caption, usage_info = vlm_client.process_single(image["image_base64"],return_usage=True)
+                    if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):
+                        logger.info(f"Captioned image with VLM {usage_info}")
+                    else:
+                        logger.info(f"Captioned image with VLM {vlm_client.config.model} (usage info unavailable)")
+                except Exception as e:
+                    logger.error(f"VLM captioning failed: {e}", exc_info=True)
+                    vlm_caption = "Image"
+            else:
+                vlm_caption = "Image"
+
+            # Replace image placeholder with captioned version
+            # "![img-0.jpeg](img-0.jpeg)" -> ![{caption}](img-1.jpeg)
+            image_pattern = r'!\[.*?\]\(.*?\)'
+            if re.search(image_pattern, markdown_page):
+                markdown_page = re.sub(image_pattern, f"![{vlm_caption}](img-{img_counter}.jpeg)", markdown_page, count=1)
+            else: # no image placeholder found, add at the end
+                markdown_page += f"\n\n![{vlm_caption}](img-{img_counter}.jpeg)"
+
+            img_counter += 1
+
+        if markdown_page.strip():
+            markdown_pages.append(markdown_page)
+
+    markdown_content = "\n\n".join(markdown_pages)
+    # Remove inappropriate line breaks within paragraphs to form coherent sentences
+    markdown_content = re.sub(r'(?<!\n)\n(?!\n)', ' ', markdown_content)
     return markdown_content
 
-def parse_mistral(cache_paths: List[str], config: ParserConfig, batch_config: Optional[BatchConfig]=None) -> List[ParseResult]:
+def parse_mistral(cache_paths: List[str], config: ParserConfig) -> List[ParseResult]:
     """
     Parse PDFs using Mistral OCR API.
 
@@ -322,7 +368,7 @@ def parse_mistral(cache_paths: List[str], config: ParserConfig, batch_config: Op
 
         markdown_content = _construct_markdown_mistral(ocr_result)
 
-        logger.debug(f"Successfully parsed {cache_path} with Mistral-OCR")
+        logger.info(f"Successfully parsed {cache_path} with Mistral-OCR")
 
         results.append(ParseResult(
             content=markdown_content,
@@ -376,55 +422,86 @@ def _poll_results(config: ParserConfig, batch_id):
 
     raise TimeoutError(f"MinerU processing timeout after {config.mineru.max_poll_time} seconds")
 
-def _construct_markdown_mineru(zip_url):
+def _construct_markdown_mineru(zip_url, config: ParserConfig):
     """Construct markdown from MinerU content_list.json with proper heading levels"""
-    import json
-    import re
+    # Handle both HTTP URLs and local file paths
+    if zip_url.startswith('file:'):
+        file_path = zip_url[5:]  # Remove 'file:' prefix
+        with open(file_path, 'rb') as f:
+            zip_data = f.read()
+    else:
+        response = requests.get(zip_url)
+        zip_data = response.content
 
-    response = requests.get(zip_url)
-    with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+    with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
         # Find content_list.json file
-        content_files = [f for f in zf.namelist() if f.endswith('_content_list.json')]
+        all_files = zf.namelist()
+        dir_prefix = all_files[0].split('/')[0] if all_files and '/' in all_files[0] else ""
+        content_files = [f for f in all_files if f.endswith('_content_list.json')]
         if not content_files:
             # Fallback to full.md if content_list.json not found
-            return zf.read("full.md").decode('utf-8')
+            return zf.read(f"{dir_prefix}/full.md").decode('utf-8')
 
         content_file = content_files[0]
         content_data = json.loads(zf.read(content_file).decode('utf-8'))
 
-    markdown_lines = []
+        vlm_client = None
+        img_counter = 1
+        if config.mineru.caption_images:
+            vlm_client = ParserVLMClient(config.vlm)
 
-    for item in content_data:
-        if item["type"] == "text":
-            text = item["text"].strip()
+        markdown_pages = []
 
-            # Handle headings based on text_level and text content
-            if "text_level" in item and item["text_level"] == 1:
-                # Count dots in heading text to determine markdown level
-                dot_count = text.count('.')
+        for item in content_data:
+            if item["type"] == "text":
+                text = item["text"].strip()
 
-                # Special cases for appendix sections like "D.2"
-                if re.match(r'^[A-Z]\.\d+', text):
-                    dot_count = text.count('.') + 1
+                # Handle headings based on text_level and text content
+                if "text_level" in item and item["text_level"] == 1:
+                    # Count dots in heading text to determine markdown level
+                    dot_count = text[:10].count('.')
 
-                # Determine markdown heading level (1-6)
-                # No dots = level 1, 1 dot = level 2, etc.
-                heading_level = min(dot_count + 1, 6)
-                markdown_lines.append(f"{'#' * heading_level} {text}")
-            else:
-                # Regular text
-                markdown_lines.append(text)
+                    # Determine markdown heading level (1-6) manually
+                    # No dots = level 1, 1 dot = level 2, etc.
+                    heading_level = min(dot_count + 1, 6)
+                    markdown_pages.append(f"{'#' * heading_level} {text}")
+                else:
+                    # Regular text
+                    markdown_pages.append(text)
 
-        elif item["type"] == "image":
-            # Handle images - for now just include captions
-            # Future: Add image captioner integration here
-            if "image_caption" in item and item["image_caption"]:
-                caption_text = " ".join(item["image_caption"])
-                markdown_lines.append(f"\n![Image]({item['img_path']})\n\n{caption_text}\n")
+            elif item["type"] == "image":
+                # Process image item
+                if vlm_client:
+                    try:
+                        image_data = zf.read(f"{dir_prefix}/{item["img_path"]}")
+                        image_base64 = f"data:image/jpg;base64,{base64.b64encode(image_data).decode('utf-8')}"
+                        vlm_caption, usage_info = vlm_client.process_single(image_base64, return_usage=True)
+                        if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):
+                            logger.info(f"Captioned image with VLM {usage_info}")
+                        else:
+                            logger.info(f"Captioned image with VLM {vlm_client.config.model} (usage info unavailable)")
+                    except Exception as e:
+                        logger.error(f"VLM captioning failed: {e}", exc_info=True)
+                        vlm_caption = "Image"
+                else:
+                    vlm_caption = "Image"
 
-    return "\n\n".join(markdown_lines)
+                if "image_caption" in item and item["image_caption"]:
+                    caption_text = " ".join(item["image_caption"]) # this is actually footnote
+                else:
+                    caption_text = f"Figure {img_counter}"
 
-def parse_mineru(cache_paths: List[str], config: ParserConfig, batch_config: Optional[BatchConfig]=None) -> List[ParseResult]:
+                markdown_pages.append(f"\n![{vlm_caption}](img{img_counter}.jpg)\n{caption_text}\n")
+
+                img_counter += 1
+            
+
+    markdown_content = "\n\n".join(markdown_pages)
+    # Remove inappropriate line breaks within paragraphs to form coherent sentences
+    markdown_content = re.sub(r'(?<!\n)\n(?!\n)', ' ', markdown_content)
+    return markdown_content
+
+def parse_mineru(cache_paths: List[str], config: ParserConfig) -> List[ParseResult]:
     """
     Parse PDFs using MinerU API batch upload.
 
@@ -456,7 +533,7 @@ def parse_mineru(cache_paths: List[str], config: ParserConfig, batch_config: Opt
             # Construct markdown content
             content = _construct_markdown_mineru(result["full_zip_url"])
 
-            logger.debug(f"Successfully parsed {cache_path} with MinerU")
+            logger.info(f"Successfully parsed {cache_path} with MinerU")
 
             parse_results.append(ParseResult(content, True, "", "mineru"))
 

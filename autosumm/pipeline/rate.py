@@ -315,7 +315,7 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
             
             if token_count <= embedder_client.context_length:
                 # Text fits, get similarity directly
-                similarity_score, usage_info = embedder_client._process_single_with_usage(content)
+                similarity_score, usage_info = embedder_client.process_single(content, return_usage=True)
                 if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):
                     logger.info(f"Rated paper with embedder {usage_info}")
                 else:
@@ -326,8 +326,8 @@ def rate_embed(parsed_contents: List[str], config: RaterConfig, batch_config: Op
                 chunk_texts = [chunk[0] for chunk in chunks]
                 chunk_weights = [chunk[1] for chunk in chunks]
                 
-                # Get similarities for all chunks (could use batch processing here)
-                chunk_similarities = [embedder_client._process_single_with_usage(chunk_text)[0] for chunk_text in chunk_texts]
+                # Get similarities for all chunks
+                chunk_similarities = [embedder_client.process_single(chunk_text, return_usage=False)[0] for chunk_text in chunk_texts]
 
                 # Calculate weighted average, filtering out None values (failed API calls)
                 valid_pairs = [(sim, weight) for sim, weight in zip(chunk_similarities, chunk_weights) if sim is not None]
@@ -372,7 +372,7 @@ def rate_llm(parsed_contents: List[str], config: RaterConfig, batch_config: Opti
         final_results = []
         for content in parsed_contents:
             token_count = count_tokens(content)
-            result, usage_info = client._process_single_with_usage(content)
+            result, usage_info = client.process_single(content, return_usage=True)
             final_results.append(
                 RateResult(
                     score=result if result is not None else 0.0,

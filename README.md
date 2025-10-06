@@ -512,6 +512,7 @@ deliver:
 | **DeepSeek** | deepseek-reasoner, deepseek-chat | DEEPSEEK_API_KEY |
 | **Gemini** | gemini-1.5-pro, gemini-1.5-flash | GEMINI_API_KEY |
 | **Groq** | llama-3.1-70b-versatile, mixtral-8x7b-32768 | GROQ_API_KEY |
+| **MinerU** | *for pdf parsing, no specific models* | MINERU_API_TOKEN |
 | **Minimax** | MiniMax-Text-01 | MINIMAX_API_KEY |
 | **Mistral** | mistral-large-latest | MISTRAL_API_KEY |
 | **ModelScope** | Qwen/Qwen2.5-7B-Instruct, Qwen/Qwen2.5-32B-Instruct | MODELSCOPE_API_KEY |
