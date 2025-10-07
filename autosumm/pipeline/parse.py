@@ -440,7 +440,8 @@ def _construct_markdown_mineru(zip_url, config: ParserConfig):
         content_files = [f for f in all_files if f.endswith('_content_list.json')]
         if not content_files:
             # Fallback to full.md if content_list.json not found
-            return zf.read(f"{dir_prefix}/full.md").decode('utf-8')
+            default_md_path = f"{dir_prefix}/full.md" if dir_prefix else "full.md"
+            return zf.read(default_md_path).decode('utf-8')
 
         content_file = content_files[0]
         content_data = json.loads(zf.read(content_file).decode('utf-8'))
@@ -473,7 +474,8 @@ def _construct_markdown_mineru(zip_url, config: ParserConfig):
                 # Process image item
                 if vlm_client:
                     try:
-                        image_data = zf.read(f"{dir_prefix}/{item['img_path']}")
+                        image_path = f"{dir_prefix}/{item['img_path']}" if dir_prefix else item['img_path']
+                        image_data = zf.read(image_path)
                         image_base64 = f"data:image/jpg;base64,{base64.b64encode(image_data).decode('utf-8')}"
                         vlm_caption, usage_info = vlm_client.process_single(image_base64, return_usage=True)
                         if usage_info and (usage_info.prompt_tokens > 0 or usage_info.completion_tokens > 0):

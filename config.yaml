@@ -2,7 +2,7 @@ run:
   categories:
   - cs.AI
   - cs.RO
-  send_log: false
+  send_log: true
   log_dir: ./logs
 
 fetch:
@@ -89,7 +89,6 @@ parse:
 render:
   formats:
     - pdf
-    - md
   output_dir: ./output
   base_filename: null
 
