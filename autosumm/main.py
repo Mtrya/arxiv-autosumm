@@ -39,9 +39,9 @@ def fetch_new_papers(category, cacher: Cacher, fetch_config: dict, verbose: bool
     logger = logging.getLogger(__name__)
 
     try:
-        # Step 1: Fetch metadata from ArXiv and filter out already summarized papers
+        # Step 1: Fetch metadata from ArXiv and filter out already delivered papers
         metadata_results = fetch_metadata(category, fetch_config)
-        new_results = [result for result in metadata_results if not cacher.is_paper_processed(result.arxiv_id)]
+        new_results = [result for result in metadata_results if not cacher.is_paper_delivered(result.arxiv_id)]
         logger.info(f"Fetched {len(metadata_results)} papers from ArXiv, found {len(new_results)} new papers to process")
 
         if not new_results:
@@ -268,9 +268,9 @@ def summarize_paper(papers: List[PaperMetadata], cacher: Cacher, summarize_confi
             
             renderable_papers.append(paper)
             try:
-                cacher.mark_paper_processed(paper.arxiv_id, {})
+                cacher.mark_paper_delivered(paper.arxiv_id, {})
             except Exception as e:
-                logger.warning(f"Failed to mark {paper.arxiv_id} as processed: {e}", exc_info=True)
+                logger.warning(f"Failed to mark {paper.arxiv_id} as delivered: {e}", exc_info=True)
             if verbose:
                 logger.debug(f"Successfully prepared summary for {paper.arxiv_id}")
         

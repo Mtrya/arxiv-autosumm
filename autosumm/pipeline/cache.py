@@ -1,6 +1,6 @@
 """
 SQLite-based caching system for ArXiv summarization pipeline.
-Caches similarity scores, rating scores, and tracks processed papers.
+Caches similarity scores, rating scores, and tracks delivered papers.
 Handles config change detection and automatic cache invalidation.
 """
 
@@ -66,11 +66,11 @@ class Cacher:
             )
         ''')
         
-        # Processed papers tracking (delivered papers)
+        # Delivered papers tracking
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS processed_papers (
+            CREATE TABLE IF NOT EXISTS delivered_papers (
                 arxiv_id TEXT PRIMARY KEY,
-                processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                delivered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 metadata_json TEXT NOT NULL
             )
         ''')
@@ -179,39 +179,38 @@ class Cacher:
         conn.close()
         logger.debug(f"Stored rating score for {arxiv_id}: {score}")
     
-    # Processed papers tracking
-    def is_paper_processed(self, arxiv_id: str) -> bool:
-        """Check if paper has been processed (delivered)."""
+    # Delivered papers tracking
+    def is_paper_delivered(self, arxiv_id: str) -> bool:
+        """Check if paper has been delivered."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         cursor.execute(
-            'SELECT 1 FROM processed_papers WHERE arxiv_id = ?',
+            'SELECT 1 FROM delivered_papers WHERE arxiv_id = ?',
             (arxiv_id,)
         )
         result = cursor.fetchone()
         conn.close()
-        
-        processed = result is not None
-        logger.debug(f"Paper {arxiv_id} summarized: {processed}")
-        return processed
-    
-    def mark_paper_processed(self, arxiv_id: str, metadata: Dict):
-        """Mark paper as processed (delivered)."""
+
+        delivered = result is not None
+        logger.debug(f"Paper {arxiv_id} delivered: {delivered}")
+        return delivered
+
+    def mark_paper_delivered(self, arxiv_id: str, metadata: Dict):
+        """Mark paper as delivered."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         metadata_json = json.dumps(metadata)
         cursor.execute(
-            'INSERT OR REPLACE INTO processed_papers (arxiv_id, metadata_json) VALUES (?, ?)',
+            'INSERT OR REPLACE INTO delivered_papers (arxiv_id, metadata_json) VALUES (?, ?)',
             (arxiv_id, metadata_json)
         )
-        
+
         conn.commit()
         conn.close()
-        logger.info(f"Marked paper {arxiv_id} as processed")
-    
-        # PDF caching interface (simple, no over-engineering)
+        logger.info(f"Marked paper {arxiv_id} as delivered")
+        
     # Config change detection & cache clearing
     def detect_and_handle_config_changes(self, current_config: Dict[str, Any]):
         """Detect config changes and clear appropriate caches."""
@@ -232,8 +231,8 @@ class Cacher:
             if last_hash is None:
                 logger.info("First run - no cache clearing needed")
             else:
-                logger.info("Configuration changed - clearing all caches except processed papers")
-                self.clear_all_cache(preserve_processed_papers=True)
+                logger.info("Configuration changed - clearing all caches except delivered papers")
+                self.clear_all_cache(preserve_delivered_papers=True)
             
             cursor.execute(
                 'INSERT INTO config_history (config_hash) VALUES (?)',
@@ -265,20 +264,20 @@ class Cacher:
         conn.close()
         logger.info(f"Cleared rater cache (rating scores) - deleted {deleted} entries")
     
-    def clear_all_cache(self, preserve_processed_papers: bool = True):
-        """Clear all caches, optionally preserving processed papers tracking."""
+    def clear_all_cache(self, preserve_delivered_papers: bool = True):
+        """Clear all caches, optionally preserving delivered papers tracking."""
         logger.info("Clearing all caches...")
         self.clear_embedder_cache()
         self.clear_rater_cache()
-        
-        if not preserve_processed_papers:
+
+        if not preserve_delivered_papers:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
-            cursor.execute('DELETE FROM processed_papers')
+            cursor.execute('DELETE FROM delivered_papers')
             deleted = cursor.rowcount
             conn.commit()
             conn.close()
-            logger.info(f"Cleared processed papers tracking - deleted {deleted} entries")
+            logger.info(f"Cleared delivered papers tracking - deleted {deleted} entries")
     
     # Maintenance
     def cleanup_expired(self):
@@ -289,7 +288,7 @@ class Cacher:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        tables = ['similarity_scores', 'rating_scores', 'processed_papers']
+        tables = ['similarity_scores', 'rating_scores', 'delivered_papers']
         total_deleted = 0
         
         for table in tables:
@@ -317,7 +316,7 @@ class Cacher:
         stats = {}
         
         # Count records in each table
-        tables = ['similarity_scores', 'rating_scores', 'processed_papers']
+        tables = ['similarity_scores', 'rating_scores', 'delivered_papers']
         for table in tables:
             cursor.execute(f'SELECT COUNT(*) FROM {table}')
             stats[f'{table}_count'] = cursor.fetchone()[0]

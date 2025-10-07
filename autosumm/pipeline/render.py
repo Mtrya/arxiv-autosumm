@@ -129,9 +129,9 @@ def render_md(summaries: List[str], category: str, config: RendererConfig) -> Re
         with preserve_logging_handlers():
             with Pool() as pool:
                 fixed_summaries = pool.map(_fix_single_markdown,summaries)
-            logger.info("Successfully fixed markdown in a separate process.")
+            logger.info("Successfully linted markdown.")
     except Exception as e:
-        logger.warning(f"Markdown fixing in a subprocess failed: {e}. Falling back to raw markdown.")
+        logger.warning(f"Failed to lint markdown: {e}. Falling back to raw markdown.")
         fixed_summaries = summaries
 
     if config.md.include_pagebreaks:

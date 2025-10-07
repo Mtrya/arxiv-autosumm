@@ -379,7 +379,7 @@ crontab -e
 The complete chronological pipeline processes research papers in the exact order of execution:
 
 - **1. Fetch**: Downloads paper metadata from ArXiv using configured categories or date ranges
-- **2. Deduplication**: Uses SQLite cache to skip already-processed papers, preventing redundant work
+- **2. Deduplication**: Uses SQLite cache to skip already-delivered papers, preventing redundant work
 - **3. Rate Limiting**: Respects ArXiv API limits with exponential backoff to avoid being blocked
 - **4. PDF Download**: Retrieves full PDFs for newly discovered papers
 - **5. Fast Parse**: Extracts text using PyPDF2 for quick initial processing
