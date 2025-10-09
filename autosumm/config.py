@@ -538,7 +538,7 @@ class MinerUConfig(BaseModel):
         )
 
 class ParserConfig(BaseModel):
-    method: Optional[str]="text-extraction"
+    method: Optional[str]="pdfminer"
     tmp_dir: Optional[str]="./tmp"
     vlm: Optional[ParserVLMConfig]=None
     """If method is 'vlm', then ParserVLMConfig is required"""
@@ -550,7 +550,7 @@ class ParserConfig(BaseModel):
     @field_validator('vlm')
     @classmethod
     def validate_vlm_required(cls, v: Optional[ParserVLMConfig], info):
-        method = info.data.get('method', 'text-extraction')
+        method = info.data.get('method', 'pdfminer')
         if method == 'vlm' and v is None:
             raise ValueError("VLM configuration is required when method is 'vlm'. Please add the vlm section with provider, model, and API configuration under parse: in your config.yaml")
         return v
@@ -558,7 +558,7 @@ class ParserConfig(BaseModel):
     @field_validator('mistral')
     @classmethod
     def validate_mistral_required(cls, v: Optional[MistralOCRConfig], info):
-        method = info.data.get('method', 'text-extraction')
+        method = info.data.get('method', 'pdfminer')
         if method == 'mistral-ocr' and v is None:
             raise ValueError("Mistral OCR configuration is required when method is 'mistral-ocr'. Please add the mistral section with model and API configuration under parse: in your config.yaml")
         return v
@@ -566,7 +566,7 @@ class ParserConfig(BaseModel):
     @field_validator('mineru')
     @classmethod
     def validate_mineru_required(cls, v: Optional[MinerUConfig], info):
-        method = info.data.get('method', 'text-extraction')
+        method = info.data.get('method', 'pdfminer')
         if method == 'mineru' and v is None:
             raise ValueError("MinerU configuration is required when method is 'mineru'. Please add the mineru section with backend configuration under parse: in your config.yaml")
         return v

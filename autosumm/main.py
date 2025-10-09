@@ -111,7 +111,7 @@ def parse_papers(papers: List[PaperMetadata], parse_config, batch_config=None, v
     cache_paths = [paper.cache_path for paper in papers]
     
     try:
-        if parse_config.method == "text-extraction":
+        if parse_config.method == "pdfminer":
             return papers # return directly, because we already have simple text extraction result in fetch_pdf
         elif parse_config.method == "vlm":
             parse_results = parse_vlm(cache_paths, parse_config, batch_config)
@@ -120,7 +120,7 @@ def parse_papers(papers: List[PaperMetadata], parse_config, batch_config=None, v
         elif parse_config.method == "mineru":
             parse_results = parse_mineru(cache_paths, parse_config)
         else:
-            logger.warning(f"Parse method '{parse_config.method}' not recognized, continue with 'text-extraction'.")
+            logger.warning(f"Parse method '{parse_config.method}' not recognized, continue with 'pdfminer'.")
             return papers
 
         for paper, result in zip(papers, parse_results):

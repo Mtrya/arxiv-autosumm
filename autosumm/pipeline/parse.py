@@ -54,7 +54,7 @@ class MinerUConfig:
 
 @dataclass
 class ParserConfig:
-    method: str
+    method: str # pdfminer, vlm, mistral-ocr or mineru, default to pdfminer
     tmp_dir: str
     vlm: Optional[ParserVLMConfig]
     mistral: Optional[MistralOCRConfig]
