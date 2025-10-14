@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
 
     steps:
     - name: Checkout repository
@@ -223,6 +224,8 @@ jobs:
         done
 
         echo "✅ Cleanup completed"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Clean up old caches
       if: github.event_name == 'schedule'

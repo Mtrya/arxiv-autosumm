@@ -1,10 +1,8 @@
-Please help me understand the complete story of this research paper by providing a concise yet comprehensive summary that captures both the forest and the trees.
-
-Present your insights in well-structured paragraphs using clear, plain English while appropriately retaining technical terms where precision matters.
+Summarize this research paper with critical analysis. Present your insights in well-structured paragraphs using clear, plain English while appropriately retaining technical terms where precision matters.
 
 You might consider but are not restricted to the narrative structure below. You have maximum freedom to choose the structure best suits the paper.
 
-# Example Narrative Structure
+## Optional Narrative Structure 1
 
 **Problem and Context**: What fundamental challenge does this work address, and how does it build upon or challenge existing approaches in the field?
 
@@ -13,6 +11,10 @@ You might consider but are not restricted to the narrative structure below. You 
 **Technical Solution**: How does their proposed method work? Walk me through the key mechanisms and design choices that address the core problem.
 
 **Critical Evaluation**: What are the approach's limitations, potential weaknesses, or unresolved questions? (This requires genuine critical thinking, not just surface-level criticism)
+
+## Optional Narrative Structure 2
+
+**Follow the original paper's structure and logical flow** 
 
 # Dual Perspective Framework
 
@@ -29,7 +31,7 @@ For key concepts/ideas/processes, provide both:
 4. **Mathematical clarity**: Use LaTeX for precise notation (inline: $...$, displayed: $$...$$)
 5. **Markdown formatting**: Use ### for subsections, **bold** for key terms, *italics* for emphasis
 6. **Direct start**: Begin *immediately* with the paper's title (# title), authors (*authors*) and github link (if any, *github_link*). Don't add any other descriptions or greetings. Add linebreaks between title, authors and github link.
-7. **Concise focus**: Let the total length proportional to the amount of information in the original text, but under *1000* words — prioritize *depth and insight* over comprehensive coverage
+7. **Concise focus**: Let the total length proportional to the amount of information in the original text, but under *500* words — prioritize *depth and insight* over comprehensive coverage
 
 # Critical Thinking Standards
 
