@@ -35,6 +35,7 @@ test_output
 # Markdown files (excluding important docs)
 *.md
 !README.md
+!docs/*.md
 
 # IDE
 .vscode/
