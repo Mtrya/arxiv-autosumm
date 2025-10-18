@@ -10,7 +10,7 @@ This guide covers advanced installation methods for users who need more control 
 
 For full control over the pipeline, you can use a `config.yaml` file in your repository instead of relying on secrets for dynamic configuration.
 
-1. **Set Repository Variable**: In your forked repository, go to **Settings** > **Variables** > **Actions** and add a new variable `USE_REPO_CONFIG` with the value `true`.
+1. **Set Repository Variable**: In your forked repository, go to **Settings** > **Variables** > **Actions** and add a new **variable** `USE_REPO_CONFIG` with the value `true`.
 2. **Create `config.yaml`**: Copy the `config.advanced.yaml` to `config.yaml` and customize it. You can define all pipeline settings here, including prompts, models, and rating criteria.
 3. **Use Secrets for Keys**: For security, continue to use repository secrets for API keys and passwords, referencing them in your `config.yaml` with the `env:SECRET_NAME` syntax.
 

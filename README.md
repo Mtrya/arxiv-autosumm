@@ -16,32 +16,31 @@ The fastest way to get started is with GitHub Actions, which automates the entir
 
 ### Steps
 
-1.  **Fork the Repository**
+1. **Fork the Repository**
 
-    Click the "Fork" button at the top-right of this page to create a copy of this repository in your own GitHub account.
+   Click the "Fork" button at the top-right of this page to create a copy of this repository in your own GitHub account.
+2. **Configure Repository Secrets**
 
-2.  **Configure Repository Secrets**
+   Navigate to your forked repository's **Settings** > **Secrets and variables** > **Actions**. Add the following secrets to configure the pipeline. Only `SUMMARIZER_API_KEY`, `RATER_API_KEY`, `SMTP_SERVER`, `SENDER_EMAIL`, `RECIPIENT_EMAIL`, and `SMTP_PASSWORD` are strictly required.
 
-    Navigate to your forked repository's **Settings** > **Secrets and variables** > **Actions**. Add the following secrets to configure the pipeline. Only `SUMMARIZER_API_KEY`, `RATER_API_KEY`, `SMTP_SERVER`, `SENDER_EMAIL`, `RECIPIENT_EMAIL`, and `SMTP_PASSWORD` are strictly required.
+   | Secret                  | Required | Description                                                                                |
+   | ----------------------- | :------: | ------------------------------------------------------------------------------------------ |
+   | `SUMMARIZER_API_KEY`  |    ✅    | API key for the summarization LLM provider (modelscope by default).                        |
+   | `RATER_API_KEY`       |    ✅    | API key for the rating LLM provider (modelscope by default).                               |
+   | `SMTP_SERVER`         |    ✅    | Your email provider's SMTP server (e.g.,`smtp.163.com`).                                 |
+   | `SENDER_EMAIL`        |    ✅    | The email address for sending summaries.                                                   |
+   | `RECIPIENT_EMAIL`     |    ✅    | The email address for receiving summaries.                                                 |
+   | `SMTP_PASSWORD`       |    ✅    | The password or app password for your sender email.                                        |
+   | `ARXIV_CATEGORIES`    |    ❌    | Comma-separated ArXiv categories (e.g.,`cs.AI,cs.CV`, default to `cs.AI,cs.CV,cs.RO`). |
+   | `MAX_PAPERS`          |    ❌    | The maximum number of papers to summarize (default to 5).                                  |
+   | `SUMMARIZER_PROVIDER` |    ❌    | The LLM provider for summarization (e.g.,`openai`, default to `modelscope`).           |
+   | `RATER_PROVIDER`      |    ❌    | The LLM provider for rating (e.g.,`anthropic`, default to `modelscope`).               |
 
-    | Secret                | Required | Description                                      |
-    | --------------------- | :------: | ------------------------------------------------ |
-    | `SUMMARIZER_API_KEY`  |    ✅    | API key for the summarization LLM.               |
-    | `RATER_API_KEY`       |    ✅    | API key for the rating LLM.                      |
-    | `SMTP_SERVER`         |    ✅    | Your email provider's SMTP server.               |
-    | `SENDER_EMAIL`        |    ✅    | The email address for sending summaries.         |
-    | `RECIPIENT_EMAIL`     |    ✅    | The email address for receiving summaries.       |
-    | `SMTP_PASSWORD`       |    ✅    | The password or app password for your sender email. |
-    | `ARXIV_CATEGORIES`    |    ❌    | Comma-separated ArXiv categories (e.g., `cs.AI,cs.CV`). |
-    | `MAX_PAPERS`          |    ❌    | The maximum number of papers to summarize.       |
-    | `SUMMARIZER_PROVIDER` |    ❌    | The LLM provider for summarization (e.g., `openai`). |
-    | `RATER_PROVIDER`      |    ❌    | The LLM provider for rating (e.g., `anthropic`). |
+3. **Enable and Run the Workflow**
 
-3.  **Enable and Run the Workflow**
-
-    - Go to the **Actions** tab in your repository.
-    - If prompted, enable the workflows.
-    - Select the **ArXiv AutoSumm Daily** workflow and click **Run workflow**.
+   - Go to the **Actions** tab in your repository.
+   - If prompted, enable the workflows.
+   - Select the **ArXiv AutoSumm Daily** workflow and click **Run workflow**.
 
 That's it! The workflow will now run on its schedule, delivering summaries to your inbox. For more advanced setups, including local installation and detailed configuration, see our [full documentation](docs/).
 
