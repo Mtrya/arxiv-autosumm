@@ -383,15 +383,16 @@ class Cacher:
         # Sort unused PDFs by modification time (oldest first)
         unused_pdfs.sort(key=lambda x: x['mtime'])
 
-        # Calculate how much to remove (remove 25% of unused files or enough to get under limit)
-        target_size_mb = self.config.max_pdf_cache_size_mb * 0.8  # Target 80% of max size
+        # Calculate target size: 80% of max or max-128MB, whichever is larger
+        target_size_mb = max(self.config.max_pdf_cache_size_mb * 0.8, 
+                           self.config.max_pdf_cache_size_mb - 128)
         size_to_remove_mb = total_size_mb - target_size_mb
 
         removed_files = 0
         removed_size_mb = 0
 
         for pdf in unused_pdfs:
-            if removed_size_mb >= size_to_remove_mb and removed_files >= len(unused_pdfs) // 4:
+            if removed_size_mb >= size_to_remove_mb:
                 break
 
             try:
